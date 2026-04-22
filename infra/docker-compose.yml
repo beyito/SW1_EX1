@@ -1,0 +1,84 @@
+services:
+  frontend:
+    build:
+      context: ..
+      dockerfile: frontend/Dockerfile
+    container_name: bpmn-frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      - backend
+    networks:
+      - bpmn-net
+
+  backend:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    container_name: bpmn-backend
+    env_file:
+      - .env
+    environment:
+      SPRING_DATA_MONGODB_URI: ${MONGODB_URI}
+      DB_URL: ${DB_URL}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      SPRING_RABBITMQ_HOST: ${SPRING_RABBITMQ_HOST}
+      SPRING_RABBITMQ_STOMP_PORT: ${SPRING_RABBITMQ_STOMP_PORT}
+      SPRING_RABBITMQ_USERNAME: ${SPRING_RABBITMQ_USERNAME}
+      SPRING_RABBITMQ_PASSWORD: ${SPRING_RABBITMQ_PASSWORD}
+      AWS_REGION: ${AWS_REGION}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      MAX_UPLOAD_SIZE: ${MAX_UPLOAD_SIZE}
+      MAX_REQUEST_SIZE: ${MAX_REQUEST_SIZE}
+      JAVA_OPTS: ${JAVA_OPTS}
+    ports:
+      - "8080:8080"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_started
+    networks:
+      - bpmn-net
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: bpmn-rabbitmq
+    command: ["/bin/sh", "-c", "rabbitmq-plugins enable --offline rabbitmq_stomp && rabbitmq-server"]
+    environment:
+      RABBITMQ_DEFAULT_USER: ${SPRING_RABBITMQ_USERNAME}
+      RABBITMQ_DEFAULT_PASS: ${SPRING_RABBITMQ_PASSWORD}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - bpmn-net
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: bpmn-postgres
+    environment:
+      POSTGRES_DB: politica_negocio
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - bpmn-net
+
+networks:
+  bpmn-net:
+    driver: bridge
+
+volumes:
+  postgres-data:

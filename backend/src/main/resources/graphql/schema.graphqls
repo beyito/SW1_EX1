@@ -1,0 +1,97 @@
+# ==========================================
+# 1. TIPOS DE DATOS
+# ==========================================
+
+type Policy {
+    id: ID!
+    name: String!
+    description: String
+    createdAt: String
+    updatedAt: String
+    diagramJson: String!
+    lanes: [Lane!]
+    
+}
+
+type Lane {
+    id: ID!
+    name: String!
+    color: String
+    x: Float
+}
+
+input LaneInput {
+    id: ID!
+    name: String!
+    color: String
+    x: Float
+}
+
+# ==========================================
+# 2. QUERIES
+# ==========================================
+type Query {
+    getAllPolicies: [Policy!]
+    getPolicyById(id: ID!): Policy
+    getTaskExecutionOrder(policyId: ID!): TaskExecutionOrder
+}
+
+type TaskOrder {
+    nodeId: ID!
+    nodeLabel: String!
+    nodeType: String!
+    order: Int!
+    dependencies: [ID!]
+    laneId: String
+    laneName: String
+}
+
+type TaskExecutionOrder {
+    policyId: ID!
+    policyName: String!
+    tasks: [TaskOrder!]!
+}
+
+enum TaskStatus {
+    PENDING
+    IN_PROGRESS
+    COMPLETED
+    REJECTED
+}
+
+type PendingTask {
+    taskInstanceId: ID!
+    processInstanceId: ID!
+    policyId: ID
+    processName: String!
+    taskId: String!
+    taskName: String!
+    laneId: String
+    status: TaskStatus!
+    createdAt: String
+}
+
+type TaskDetail {
+    id: ID!
+    taskName: String!
+    processName: String!
+    status: TaskStatus!
+    description: String
+    formSchema: String
+    formData: String
+}
+
+# ==========================================
+# 3. MUTATIONS
+# ==========================================
+type Mutation {
+    createPolicy(name: String!, description: String): Policy
+    updatePolicyGraph(policyId: ID!, diagramJson: String!, lanes: [LaneInput!]): Policy
+    takeTask(taskId: ID!): TaskDetail
+    completeTask(taskId: ID!, formData: String!): TaskDetail
+}
+
+extend type Query {
+    myTasks: [PendingTask!]!
+    getTaskDetail(taskId: ID!): TaskDetail
+}
