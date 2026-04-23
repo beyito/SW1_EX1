@@ -65,6 +65,28 @@
                 @case ('boolean') {
                   <input [id]="fieldName(field, $index)" type="checkbox" [formControlName]="fieldName(field, $index)" />
                 }
+                
+                @case ('file') {
+                  <div class="file-upload-wrapper">
+                    <input 
+                      [id]="fieldName(field, $index)" 
+                      type="file" 
+                      (change)="onFileSelected($event, fieldName(field, $index))" 
+                      [disabled]="uploadingFiles[fieldName(field, $index)]" 
+                    />
+                    
+                    <input type="hidden" [formControlName]="fieldName(field, $index)" />
+
+                    @if (uploadingFiles[fieldName(field, $index)]) {
+                      <small style="color: #007bff; display: block; margin-top: 5px;">⏳ Subiendo archivo a AWS...</small>
+                    }
+
+                    @if (formGroup.get(fieldName(field, $index))?.value && !uploadingFiles[fieldName(field, $index)]) {
+                      <small style="color: #28a745; display: block; margin-top: 5px;">✅ Archivo adjunto correctamente</small>
+                    }
+                  </div>
+                }
+
                 @default {
                   <input [id]="fieldName(field, $index)" [type]="field.type || 'text'" [formControlName]="fieldName(field, $index)" [placeholder]="field.placeholder || ''" />
                 }
@@ -77,16 +99,13 @@
           }
 
           <div class="actions">
-            <button 
-  class="btn btn-success" 
-  type="submit" 
-  [disabled]="completingTask || formGroup.invalid">
-  {{ completingTask ? 'Completando...' : 'Completar Tarea' }}
-</button>
+            <button class="btn btn-success" type="submit" [disabled]="completingTask || formGroup.invalid">
+              {{ completingTask ? 'Completando...' : 'Completar Tarea' }}
+            </button>
 
-@if (formGroup.invalid && formGroup.touched) {
-  <p class="error-hint">⚠️ Debes completar todos los campos obligatorios antes de continuar.</p>
-}
+            @if (formGroup.invalid && formGroup.touched) {
+              <p class="error-hint">⚠️ Debes completar todos los campos obligatorios antes de continuar.</p>
+            }
           </div>
         </form>
       }
@@ -98,7 +117,17 @@
             @for (field of formSchemaFields; track fieldName(field, $index); let i = $index) {
               <div class="answer-item">
                 <span class="answer-label">{{ field.label || fieldName(field, i) }}:</span>
-                <span class="answer-value">{{ savedAnswers[fieldName(field, i)] ?? 'Sin respuesta' }}</span>
+                <span class="answer-value">
+                  
+                  @if (field.type === 'file' && savedAnswers[fieldName(field, i)]) {
+                    <a [href]="savedAnswers[fieldName(field, i)]" target="_blank" class="download-link" style="color: #007bff; text-decoration: underline;">
+                      📄 Ver Documento Adjunto
+                    </a>
+                  } @else {
+                    {{ savedAnswers[fieldName(field, i)] ?? 'Sin respuesta' }}
+                  }
+
+                </span>
               </div>
             }
           } @else {

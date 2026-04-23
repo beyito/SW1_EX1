@@ -120,5 +120,34 @@ export class ExecutionService {
     }
     return headers;
   }
+
+  // ... tus otros métodos ...
+
+  public async uploadFile(file: File, policyId?: string): Promise<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (policyId) {
+      formData.append('policyId', policyId);
+    }
+
+    // Copiamos los headers de autenticación pero ELIMINAMOS el Content-Type
+    // para que el navegador ponga automáticamente 'multipart/form-data'
+    const headers: Record<string, string> = { ...this.authHeaders };
+    delete headers['Content-Type'];
+
+    const response = await fetch(`${this.baseUrl.replace('/execution', '/files')}/upload`, {
+      method: 'POST',
+      headers: headers,
+      body: formData
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(error || 'No se pudo subir el archivo a S3');
+    }
+
+    return response.json(); // Esto devolverá tu UploadResponseDto (con la URL)
+  }
+  
 }
 

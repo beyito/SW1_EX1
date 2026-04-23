@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { firstValueFrom } from '../../../../../node_modules/rxjs/dist/types';
+import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../../auth.service';
 
 export interface UploadedFile {

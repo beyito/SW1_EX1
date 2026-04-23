@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core'; // 🚩 Importamos ChangeDetectorRef
+import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ExecutionService } from '../../services/execution.service';
@@ -19,7 +19,7 @@ export class TaskExecutionComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
   private readonly executionService = inject(ExecutionService);
-  private readonly cdr = inject(ChangeDetectorRef); // 🚩 Inyectamos el detector de cambios
+  private readonly cdr = inject(ChangeDetectorRef);
 
   public loading = false;
   public takingTask = false;
@@ -30,6 +30,9 @@ export class TaskExecutionComponent implements OnInit {
   public formGroup: DynamicFormGroup = this.fb.group({}) as DynamicFormGroup;
   public formReady = false;
   public savedAnswers: Record<string, unknown> = {};
+
+  // 🚩 AGREGADO PARA S3: Control de estado de subida por cada campo
+  public uploadingFiles: Record<string, boolean> = {};
 
   public ngOnInit(): void {
     void this.loadTaskDetails();
@@ -46,14 +49,14 @@ export class TaskExecutionComponent implements OnInit {
   public async loadTaskDetails(): Promise<void> {
     if (!this.taskId) {
       this.message = 'No se encontro una tarea para ejecutar.';
-      this.cdr.detectChanges(); // 🚩 Actualizamos vista
+      this.cdr.detectChanges(); 
       return;
     }
 
     this.loading = true;
     this.message = '';
     this.formReady = false;
-    this.cdr.detectChanges(); // 🚩 Avisamos que empezamos a cargar
+    this.cdr.detectChanges(); 
 
     try {
       const detail = await this.executionService.getTaskDetails(this.taskId);
@@ -62,12 +65,11 @@ export class TaskExecutionComponent implements OnInit {
       this.formGroup = this.buildForm(this.formSchemaFields);
       this.formReady = true;
       this.savedAnswers = this.parseFormData(detail.formData);
-      console.log('Task details loaded:', { detail, formSchemaFields: this.formSchemaFields, savedAnswers: this.savedAnswers });
     } catch (error) {
       this.message = error instanceof Error ? error.message : 'No se pudo cargar el detalle de la tarea';
     } finally {
       this.loading = false;
-      this.cdr.detectChanges(); // 🚩 LA SOLUCIÓN: Despierta Angular, la carga terminó
+      this.cdr.detectChanges(); 
     }
   }
 
@@ -77,23 +79,47 @@ export class TaskExecutionComponent implements OnInit {
     }
     this.takingTask = true;
     this.message = '';
-    this.cdr.detectChanges(); // 🚩 Actualizamos estado del botón
+    this.cdr.detectChanges(); 
 
     try {
       await this.executionService.takeTask(this.taskDetail.id);
-      await this.loadTaskDetails(); // Esto ya trae su propio detectChanges
+      await this.loadTaskDetails(); 
     } catch (error) {
       this.message = error instanceof Error ? error.message : 'No se pudo tomar la tarea';
     } finally {
       this.takingTask = false;
-      this.cdr.detectChanges(); // 🚩 Actualizamos vista
+      this.cdr.detectChanges(); 
+    }
+  }
+
+  // 🚩 AGREGADO PARA S3: Método para interceptar archivos y subirlos
+  public async onFileSelected(event: Event, controlName: string): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) return;
+
+    const file = input.files[0];
+    this.uploadingFiles[controlName] = true;
+    this.cdr.detectChanges(); // Despertar UI para mostrar "Subiendo..."
+
+    try {
+      const policyId = this.taskDetail?.policyId || 'general'; 
+      const uploadResult = await this.executionService.uploadFile(file, policyId);
+      
+      this.formGroup.get(controlName)?.setValue(uploadResult.url);
+      this.formGroup.get(controlName)?.markAsDirty();
+    } catch (error) {
+      console.error('Error subiendo archivo a S3:', error);
+      alert('Error al subir el archivo. Intente nuevamente.');
+      input.value = ''; 
+    } finally {
+      this.uploadingFiles[controlName] = false;
+      this.cdr.detectChanges(); // Despertar UI para ocultar "Subiendo..."
     }
   }
 
   public async submitTask(): Promise<void> {
-    // Protección doble: si el formulario es inválido, no hacemos nada
     if (this.formGroup.invalid) {
-      this.formGroup.markAllAsTouched(); // Marca todos para que aparezcan los mensajes de error en rojo
+      this.formGroup.markAllAsTouched(); 
       this.message = 'Existen campos obligatorios sin completar.';
       this.cdr.detectChanges();
       return;
@@ -104,7 +130,6 @@ export class TaskExecutionComponent implements OnInit {
     this.cdr.detectChanges();
 
     try {
-      // Extraemos los valores limpios del formulario
       const payload = JSON.stringify(this.formGroup.getRawValue());
       await this.executionService.completeTask(this.taskDetail!.id, payload);
       await this.router.navigate(['/funcionario-dashboard']);
@@ -118,26 +143,40 @@ export class TaskExecutionComponent implements OnInit {
 
   public saveProgress(): void {
     this.message = 'Progreso guardado localmente (no persistente).';
-    this.cdr.detectChanges(); // 🚩 Actualizamos mensaje
+    this.cdr.detectChanges(); 
   }
 
-  // ... (tus demás métodos se quedan igual)
-  public statusLabel(status: string): string { /* ... */ return ''; }
-  public statusClass(status: string): string { /* ... */ return ''; }
+  public statusLabel(status: string): string { 
+    const labels: Record<string, string> = { 'PENDING': 'Pendiente', 'IN_PROGRESS': 'En Progreso', 'COMPLETED': 'Completada' };
+    return labels[status] || status; 
+  }
+
+  public statusClass(status: string): string { 
+    return `status-badge ${status.toLowerCase()}`;
+  }
+
   public fieldName(field: TaskFormField, index: number): string {
     if (!field) return `field_${index}`;
-    // Intentamos buscar name, si no existe buscamos id, si no, usamos el índice
     const nameStr = field.name || field.id || `field_${index}`;
     return nameStr.trim();
   }
-  public getFieldControl(field: TaskFormField, index: number): FormControl | null { /* ... */ return null; }
-  public shouldShowError(field: TaskFormField, index: number): boolean { /* ... */ return false; }
+
+  public getFieldControl(field: TaskFormField, index: number): FormControl | null { 
+    return this.formGroup.get(this.fieldName(field, index)) as FormControl | null;
+  }
+
+  public shouldShowError(field: TaskFormField, index: number): boolean { 
+    const control = this.getFieldControl(field, index);
+    return !!(control && control.invalid && (control.dirty || control.touched));
+  }
+
   private buildForm(fields: TaskFormField[]): DynamicFormGroup {
     const controls: Record<string, FormControl> = {};
 
     fields.forEach((field, index) => {
       const controlName = this.fieldName(field, index);
-      const isRequired = true;
+      // Aquí usas la propiedad 'required' real que viene del JSON, o false por defecto
+      const isRequired = field.required ?? false; 
       const isBooleanField = field.type === 'checkbox' || field.type === 'boolean';
 
       controls[controlName] = this.fb.control(
@@ -150,19 +189,15 @@ export class TaskExecutionComponent implements OnInit {
 
     return this.fb.group(controls) as DynamicFormGroup;
   }
-  private parseSchema(rawSchema: string): TaskFormField[] {
-    if (!rawSchema || !rawSchema.trim()) {
-      return [];
-    }
-    try {
-      // Primer intento de parseo
-      let parsed = JSON.parse(rawSchema);
-      
-      // 🚩 Si el backend lo envió "doblemente" stringificado, lo parseamos de nuevo
-      if (typeof parsed === 'string') {
-        parsed = JSON.parse(parsed);
-      }
 
+  private parseSchema(rawSchema: string): TaskFormField[] {
+    if (!rawSchema || !rawSchema.trim()) return [];
+    try {
+      let parsed = JSON.parse(rawSchema);
+      if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+      
+      // Manejamos si viene como objeto { fields: [...] } o array directo
+      if (parsed && Array.isArray(parsed.fields)) return parsed.fields;
       return Array.isArray(parsed) ? parsed : [];
     } catch (error) {
       console.error('Error al parsear formSchema:', error);
@@ -171,17 +206,10 @@ export class TaskExecutionComponent implements OnInit {
   }
 
   private parseFormData(rawFormData?: string | null): Record<string, unknown> {
-    if (!rawFormData || !rawFormData.trim()) {
-      return {};
-    }
+    if (!rawFormData || !rawFormData.trim()) return {};
     try {
       let parsed = JSON.parse(rawFormData);
-      
-      // 🚩 Misma protección para las respuestas guardadas
-      if (typeof parsed === 'string') {
-        parsed = JSON.parse(parsed);
-      }
-
+      if (typeof parsed === 'string') parsed = JSON.parse(parsed);
       return parsed && typeof parsed === 'object' ? parsed : {};
     } catch (error) {
       console.error('Error al parsear formData:', error);
