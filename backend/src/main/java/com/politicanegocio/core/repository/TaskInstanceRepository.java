@@ -9,6 +9,8 @@ import java.util.List;
 public interface TaskInstanceRepository extends MongoRepository<TaskInstance, String> {
     List<TaskInstance> findByLaneId(String laneId);
     List<TaskInstance> findByLaneIdAndStatus(String laneId, TaskInstanceStatus status);
+    List<TaskInstance> findByProcessInstanceIdInAndStatusAndLaneId(List<String> processInstanceIds, TaskInstanceStatus status, String laneId);
+    List<TaskInstance> findByProcessInstanceIdInAndStatus(List<String> processInstanceIds, TaskInstanceStatus status);
     List<TaskInstance> findByAssignedTo(String assignedTo);
     boolean existsByProcessInstanceIdAndTaskIdAndStatus(String processInstanceId, String taskId, TaskInstanceStatus status);
     boolean existsByProcessInstanceIdAndTaskIdAndStatusNot(String processInstanceId, String taskId, TaskInstanceStatus status);

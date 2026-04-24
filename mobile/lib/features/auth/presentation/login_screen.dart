@@ -3,15 +3,18 @@ import 'package:flutter/material.dart';
 import '../data/auth_service.dart';
 import '../../dashboard/data/dashboard_service.dart';
 import '../../dashboard/presentation/dashboard_screen.dart';
+import '../../tasks/services/task_service.dart';
 
 class LoginScreen extends StatefulWidget {
   final AuthService authService;
   final DashboardService dashboardService;
+  final TaskService taskService;
 
   const LoginScreen({
     super.key,
     required this.authService,
     required this.dashboardService,
+    required this.taskService,
   });
 
   @override
@@ -54,6 +57,7 @@ class _LoginScreenState extends State<LoginScreen> {
           builder: (_) => DashboardScreen(
             authService: widget.authService,
             dashboardService: widget.dashboardService,
+            taskService: widget.taskService,
           ),
         ),
       );

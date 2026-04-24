@@ -6,6 +6,7 @@ import 'core/network/api_client.dart';
 import 'core/storage/secure_storage_service.dart';
 import 'features/auth/data/auth_service.dart';
 import 'features/dashboard/data/dashboard_service.dart';
+import 'features/tasks/services/task_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,11 +16,13 @@ Future<void> main() async {
   final apiClient = ApiClient(secureStorageService);
   final authService = AuthService(apiClient, secureStorageService);
   final dashboardService = DashboardService(apiClient);
+  final taskService = TaskService(apiClient);
 
   runApp(
     MobileApp(
       authService: authService,
       dashboardService: dashboardService,
+      taskService: taskService,
     ),
   );
 }

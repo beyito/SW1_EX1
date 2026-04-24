@@ -13,6 +13,8 @@ import com.politicanegocio.core.model.User;
 import com.politicanegocio.core.repository.PolicyRepository;
 import com.politicanegocio.core.repository.ProcessInstanceRepository;
 import com.politicanegocio.core.repository.TaskInstanceRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -27,6 +29,10 @@ import java.util.stream.Collectors;
 
 @Service
 public class ProcessExecutionService {
+    private static final String CLIENT_AREA_NAME = "Cliente";
+    private static final String LEGACY_CLIENT_LANE_ID = "lane_cliente";
+    private static final String ROLE_CLIENT = "CLIENT";
+    private static final Logger log = LoggerFactory.getLogger(ProcessExecutionService.class);
 
     private final ProcessInstanceRepository processInstanceRepository;
     private final TaskInstanceRepository taskInstanceRepository;
@@ -76,9 +82,11 @@ public class ProcessExecutionService {
         return savedProcessInstance;
     }
 
-    public TaskInstance completeTask(String taskInstanceId, String formData, String username) {
+    public TaskInstance completeTask(String taskInstanceId, String formData, User user) {
         TaskInstance taskInstance = taskInstanceRepository.findById(taskInstanceId)
                 .orElseThrow(() -> new RuntimeException("Tarea no encontrada con ID: " + taskInstanceId));
+        assertUserCanAccessTask(user, taskInstance);
+        String username = user.getUsername();
 
         if (taskInstance.getStatus() == TaskInstanceStatus.PENDING) {
             throw new RuntimeException("Debes tomar la tarea antes de completarla");
@@ -160,9 +168,11 @@ public class ProcessExecutionService {
         return completedTask;
     }
 
-    public TaskInstance takeTask(String taskInstanceId, String username) {
+    public TaskInstance takeTask(String taskInstanceId, User user) {
         TaskInstance taskInstance = taskInstanceRepository.findById(taskInstanceId)
                 .orElseThrow(() -> new RuntimeException("Tarea no encontrada con ID: " + taskInstanceId));
+        assertUserCanAccessTask(user, taskInstance);
+        String username = user.getUsername();
 
         if (taskInstance.getStatus() == TaskInstanceStatus.COMPLETED) {
             throw new RuntimeException("La tarea ya fue completada");
@@ -221,6 +231,9 @@ public class ProcessExecutionService {
     }
 
     public List<PendingTaskDto> getMyPendingTasks(User user) {
+        if (isClientUser(user)) {
+            return getClientPendingTasks(user);
+        }
         String laneId = resolveUserLaneId(user);
         if (laneId.isBlank()) {
             return List.of();
@@ -229,6 +242,9 @@ public class ProcessExecutionService {
     }
 
     public List<PendingTaskDto> getMyTasks(User user) {
+        if (isClientUser(user)) {
+            return getMyPendingTasks(user);
+        }
         String laneId = resolveUserLaneId(user);
         if (laneId.isBlank()) {
             return List.of();
@@ -249,9 +265,70 @@ public class ProcessExecutionService {
         return mapToPendingTaskDtos(tasks);
     }
 
-    public TaskDetailDto getTaskDetail(String taskInstanceId) {
+    public List<PendingTaskDto> getClientPendingTasks(User user) {
+        if (user == null || user.getUsername() == null || user.getUsername().isBlank()) {
+            log.warn("getClientPendingTasks: usuario nulo o sin username");
+            return List.of();
+        }
+
+        String laneId = resolveUserLaneId(user);
+        if (laneId.isBlank()) {
+            log.warn("getClientPendingTasks: laneId vacio para usuario={}", user.getUsername());
+            return List.of();
+        }
+
+        List<String> processInstanceIds = processInstanceRepository.findByStartedBy(user.getUsername().trim()).stream()
+                .map(ProcessInstance::getId)
+                .filter(id -> id != null && !id.isBlank())
+                .toList();
+
+        if (processInstanceIds == null || processInstanceIds.isEmpty()) {
+            log.info("getClientPendingTasks: sin procesos iniciados para usuario={}", user.getUsername());
+            return List.of();
+        }
+
+        List<TaskInstance> tasks = taskInstanceRepository.findByProcessInstanceIdInAndStatusAndLaneId(
+                processInstanceIds,
+                TaskInstanceStatus.PENDING,
+                laneId
+        );
+
+        log.info(
+                "getClientPendingTasks: usuario={} laneId={} processCount={} pendingMatchedCount={}",
+                user.getUsername(),
+                laneId,
+                processInstanceIds.size(),
+                tasks.size()
+        );
+
+        if (tasks.isEmpty()) {
+            List<TaskInstance> allPendingForUserProcesses = taskInstanceRepository.findByProcessInstanceIdInAndStatus(
+                    processInstanceIds,
+                    TaskInstanceStatus.PENDING
+            );
+            String lanesFound = allPendingForUserProcesses.stream()
+                    .map(task -> task.getLaneId() == null ? "<null>" : task.getLaneId())
+                    .distinct()
+                    .sorted()
+                    .collect(Collectors.joining(", "));
+            log.warn(
+                    "getClientPendingTasks: 0 tareas para laneId={} usuario={}. Lanes pendientes encontrados en esos procesos: [{}]",
+                    laneId,
+                    user.getUsername(),
+                    lanesFound
+            );
+        }
+
+        if (tasks.isEmpty()) {
+            return List.of();
+        }
+        return mapToPendingTaskDtos(tasks);
+    }
+
+    public TaskDetailDto getTaskDetail(String taskInstanceId, User user) {
         TaskInstance taskInstance = taskInstanceRepository.findById(taskInstanceId)
                 .orElseThrow(() -> new RuntimeException("Tarea no encontrada con ID: " + taskInstanceId));
+        assertUserCanAccessTask(user, taskInstance);
 
         ProcessInstance processInstance = processInstanceRepository.findById(taskInstance.getProcessInstanceId())
                 .orElseThrow(() -> new RuntimeException("Instancia de proceso no encontrada"));
@@ -349,9 +426,9 @@ public class ProcessExecutionService {
             return "";
         }
         if (user.getLaneId() != null && !user.getLaneId().isBlank()) {
-            return user.getLaneId().trim();
+            return normalizeLaneId(user.getLaneId());
         }
-        return user.getArea() != null ? user.getArea().trim() : "";
+        return user.getArea() != null ? normalizeLaneId(user.getArea()) : "";
     }
 
     // =========================================================================
@@ -410,10 +487,62 @@ public class ProcessExecutionService {
             taskInstance.setId(UUID.randomUUID().toString());
             taskInstance.setProcessInstanceId(processInstanceId);
             taskInstance.setTaskId(node.nodeId());
-            taskInstance.setLaneId(node.laneId());
+            taskInstance.setLaneId(normalizeLaneId(node.laneId()));
             taskInstance.setStatus(TaskInstanceStatus.PENDING);
             taskInstance.setCreatedAt(LocalDateTime.now());
             taskInstanceRepository.save(taskInstance);
+            log.info(
+                    "createSinglePendingTask: processInstanceId={} taskId={} laneRaw={} laneSaved={}",
+                    processInstanceId,
+                    node.nodeId(),
+                    node.laneId(),
+                    taskInstance.getLaneId()
+            );
+        }
+    }
+
+    private String normalizeLaneId(String laneId) {
+        if (laneId == null) {
+            return "";
+        }
+        String normalized = laneId.trim();
+        if (LEGACY_CLIENT_LANE_ID.equalsIgnoreCase(normalized) || CLIENT_AREA_NAME.equalsIgnoreCase(normalized)) {
+            return CLIENT_AREA_NAME;
+        }
+        return normalized;
+    }
+
+    private boolean isClientUser(User user) {
+        return user != null && user.getRoles() != null && user.getRoles().contains(ROLE_CLIENT);
+    }
+
+    private void assertUserCanAccessTask(User user, TaskInstance taskInstance) {
+        if (user == null || taskInstance == null) {
+            throw new RuntimeException("Acceso denegado a la tarea");
+        }
+        ProcessInstance processInstance = processInstanceRepository.findById(taskInstance.getProcessInstanceId())
+                .orElseThrow(() -> new RuntimeException("Instancia de proceso no encontrada"));
+
+        if (isClientUser(user)) {
+            String username = user.getUsername() == null ? "" : user.getUsername().trim();
+            String startedBy = processInstance.getStartedBy() == null ? "" : processInstance.getStartedBy().trim();
+            if (!username.equals(startedBy)) {
+                throw new RuntimeException("No tienes permisos para acceder a esta tarea");
+            }
+            String userLane = resolveUserLaneId(user);
+            String taskLane = normalizeLaneId(taskInstance.getLaneId());
+            if (!userLane.equals(taskLane)) {
+                throw new RuntimeException("La tarea no pertenece a tu carril");
+            }
+            return;
+        }
+
+        String userLane = resolveUserLaneId(user);
+        String taskLane = normalizeLaneId(taskInstance.getLaneId());
+        boolean isAssignedToUser = taskInstance.getAssignedTo() != null
+                && taskInstance.getAssignedTo().equals(user.getUsername());
+        if (!isAssignedToUser && !userLane.equals(taskLane)) {
+            throw new RuntimeException("No tienes permisos para acceder a esta tarea");
         }
     }
 }

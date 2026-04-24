@@ -19,7 +19,6 @@ import static org.springframework.http.HttpStatus.NOT_FOUND;
 @Service
 public class AdminService {
     public static final String CLIENT_AREA_NAME = "Cliente";
-    public static final String CLIENT_LANE_ID = "lane_cliente";
     private static final String ROLE_FUNCTIONARY = "FUNCTIONARY";
     private static final String ROLE_CLIENT = "CLIENT";
     private static final String ROLE_COMPANY_ADMIN = "COMPANY_ADMIN";
@@ -128,11 +127,7 @@ public class AdminService {
                 .toList();
         for (User user : usersToUpdate) {
             user.setArea(normalizedName);
-            if (CLIENT_AREA_NAME.equalsIgnoreCase(normalizedName)) {
-                user.setLaneId(CLIENT_LANE_ID);
-            } else {
-                user.setLaneId(normalizedName);
-            }
+            user.setLaneId(normalizedName);
             userRepository.save(user);
         }
 
@@ -240,7 +235,7 @@ public class AdminService {
         user.setCompany(company);
         user.setParentCompany(company);
         user.setArea(CLIENT_AREA_NAME);
-        user.setLaneId(CLIENT_LANE_ID);
+        user.setLaneId(CLIENT_AREA_NAME);
         return userRepository.save(user);
     }
 
@@ -258,7 +253,7 @@ public class AdminService {
             client.setPassword(passwordEncoder.encode(rawPassword));
         }
         client.setArea(CLIENT_AREA_NAME);
-        client.setLaneId(CLIENT_LANE_ID);
+        client.setLaneId(CLIENT_AREA_NAME);
         return userRepository.save(client);
     }
 

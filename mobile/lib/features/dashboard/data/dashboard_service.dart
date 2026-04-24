@@ -27,4 +27,20 @@ class DashboardService {
       throw Exception(backendMessage.isNotEmpty ? backendMessage : 'No se pudo cargar el dashboard.');
     }
   }
+
+  Future<void> startProcess(String policyId) async {
+    try {
+      await _apiClient.dio.post(
+        '/api/execution/process/start',
+        data: {'policyId': policyId},
+      );
+    } on DioException catch (error) {
+      final backendMessage = error.response?.data is Map
+          ? (error.response?.data['message']?.toString() ?? '')
+          : '';
+      throw Exception(
+        backendMessage.isNotEmpty ? backendMessage : 'No se pudo iniciar el tramite.',
+      );
+    }
+  }
 }

@@ -28,22 +28,23 @@ public class ExecutionGraphQLController {
     }
 
     @QueryMapping
-    public TaskDetailDto getTaskDetail(@Argument String taskId) {
-        return processExecutionService.getTaskDetail(taskId);
+    public TaskDetailDto getTaskDetail(@Argument String taskId, Authentication authentication) {
+        User user = getCurrentUser(authentication);
+        return processExecutionService.getTaskDetail(taskId, user);
     }
 
     @MutationMapping
     public TaskDetailDto takeTask(@Argument String taskId, Authentication authentication) {
         User user = getCurrentUser(authentication);
-        processExecutionService.takeTask(taskId, user.getUsername());
-        return processExecutionService.getTaskDetail(taskId);
+        processExecutionService.takeTask(taskId, user);
+        return processExecutionService.getTaskDetail(taskId, user);
     }
 
     @MutationMapping
     public TaskDetailDto completeTask(@Argument String taskId, @Argument String formData, Authentication authentication) {
         User user = getCurrentUser(authentication);
-        processExecutionService.completeTask(taskId, formData, user.getUsername());
-        return processExecutionService.getTaskDetail(taskId);
+        processExecutionService.completeTask(taskId, formData, user);
+        return processExecutionService.getTaskDetail(taskId, user);
     }
 
     private User getCurrentUser(Authentication authentication) {

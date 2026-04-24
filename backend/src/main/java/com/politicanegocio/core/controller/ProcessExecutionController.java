@@ -10,6 +10,7 @@ import com.politicanegocio.core.model.User;
 import com.politicanegocio.core.service.PolicyService;
 import com.politicanegocio.core.service.ProcessExecutionService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -47,8 +48,8 @@ public class ProcessExecutionController {
             @RequestBody CompleteTaskRequest request,
             Authentication authentication
     ) {
-        String username = getCurrentUser(authentication).getUsername();
-        return ResponseEntity.ok(processExecutionService.completeTask(taskInstanceId, request.formData(), username));
+        User user = getCurrentUser(authentication);
+        return ResponseEntity.ok(processExecutionService.completeTask(taskInstanceId, request.formData(), user));
     }
 
     @PostMapping("/tasks/{taskInstanceId}/take")
@@ -56,13 +57,14 @@ public class ProcessExecutionController {
             @PathVariable String taskInstanceId,
             Authentication authentication
     ) {
-        String username = getCurrentUser(authentication).getUsername();
-        return ResponseEntity.ok(processExecutionService.takeTask(taskInstanceId, username));
+        User user = getCurrentUser(authentication);
+        return ResponseEntity.ok(processExecutionService.takeTask(taskInstanceId, user));
     }
 
     @GetMapping("/tasks/{taskInstanceId}")
-    public ResponseEntity<TaskDetailDto> getTaskDetail(@PathVariable String taskInstanceId) {
-        return ResponseEntity.ok(processExecutionService.getTaskDetail(taskInstanceId));
+    public ResponseEntity<TaskDetailDto> getTaskDetail(@PathVariable String taskInstanceId, Authentication authentication) {
+        User user = getCurrentUser(authentication);
+        return ResponseEntity.ok(processExecutionService.getTaskDetail(taskInstanceId, user));
     }
 
     @GetMapping("/tasks/pending/{laneId}")
@@ -83,6 +85,13 @@ public class ProcessExecutionController {
     public ResponseEntity<List<PendingTaskDto>> getMyTasks(Authentication authentication) {
         User user = getCurrentUser(authentication);
         return ResponseEntity.ok(processExecutionService.getMyTasks(user));
+    }
+
+    @GetMapping("/client/tasks/pending")
+    @PreAuthorize("hasAuthority('CLIENT')")
+    public ResponseEntity<List<PendingTaskDto>> getClientPendingTasks(Authentication authentication) {
+        User user = getCurrentUser(authentication);
+        return ResponseEntity.ok(processExecutionService.getMyPendingTasks(user));
     }
 
     private User getCurrentUser(Authentication authentication) {

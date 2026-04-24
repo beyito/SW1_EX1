@@ -15,7 +15,7 @@ import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 @Service
 public class AuthService {
     private static final String CLIENT_AREA_NAME = "Cliente";
-    private static final String CLIENT_LANE_ID = "lane_cliente";
+    private static final String LEGACY_CLIENT_LANE_ID = "lane_cliente";
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -89,6 +89,18 @@ public class AuthService {
     }
 
     private boolean isClientAreaUser(User user) {
-        return CLIENT_AREA_NAME.equalsIgnoreCase(user.getArea()) || CLIENT_LANE_ID.equalsIgnoreCase(user.getLaneId());
+        return CLIENT_AREA_NAME.equalsIgnoreCase(normalizeLaneId(user.getArea()))
+                || CLIENT_AREA_NAME.equalsIgnoreCase(normalizeLaneId(user.getLaneId()));
+    }
+
+    private String normalizeLaneId(String laneId) {
+        if (laneId == null) {
+            return "";
+        }
+        String normalized = laneId.trim();
+        if (LEGACY_CLIENT_LANE_ID.equalsIgnoreCase(normalized) || CLIENT_AREA_NAME.equalsIgnoreCase(normalized)) {
+            return CLIENT_AREA_NAME;
+        }
+        return normalized;
     }
 }

@@ -21,7 +21,8 @@ import java.util.*;
 public class PolicyService {
 
     private static final String CLIENT_ROLE = "CLIENT";
-    private static final String CLIENT_START_LANE_ID = "lane_cliente";
+    private static final String CLIENT_AREA_NAME = "Cliente";
+    private static final String LEGACY_CLIENT_LANE_ID = "lane_cliente";
 
     private final PolicyRepository policyRepository;
     private final BpmnStartLaneParser bpmnStartLaneParser;
@@ -41,7 +42,7 @@ public class PolicyService {
             policy.setName(name);
             policy.setDescription(description);
             policy.setDiagramJson("{\"cells\":[]}");
-            policy.setStartLaneId(bpmnStartLaneParser.extractStartLaneId(policy.getDiagramJson()));
+            policy.setStartLaneId(normalizeLaneId(bpmnStartLaneParser.extractStartLaneId(policy.getDiagramJson())));
             policy.setCompanyId(currentUser.getCompany());
             policy.setCompanyName(currentUser.getParentCompany());
             policy.setCreatedBy(currentUser.getUsername());
@@ -74,7 +75,7 @@ public class PolicyService {
         }
 
         if (user.getRoles() != null && user.getRoles().contains(CLIENT_ROLE)) {
-            return policyRepository.findByCompanyIdAndStartLaneId(companyId, CLIENT_START_LANE_ID);
+            return policyRepository.findByCompanyIdAndStartLaneId(companyId, CLIENT_AREA_NAME);
         }
 
         String userLaneId = resolveUserLaneId(user);
@@ -88,11 +89,14 @@ public class PolicyService {
         if (user == null || policy == null) {
             return false;
         }
+        if (user.getRoles() != null && user.getRoles().contains(CLIENT_ROLE)) {
+            return CLIENT_AREA_NAME.equals(normalizeLaneId(Objects.toString(policy.getStartLaneId(), "")));
+        }
         String userLaneId = resolveUserLaneId(user);
         if (userLaneId.isBlank()) {
             return false;
         }
-        return userLaneId.equals(Objects.toString(policy.getStartLaneId(), ""));
+        return userLaneId.equals(normalizeLaneId(Objects.toString(policy.getStartLaneId(), "")));
     }
 
     public Policy getPolicyById(String id) {
@@ -131,7 +135,7 @@ public class PolicyService {
 
             String updatedDiagramJson = objectMapper.writeValueAsString(rootNode);
             policy.setDiagramJson(updatedDiagramJson);
-            policy.setStartLaneId(bpmnStartLaneParser.extractStartLaneId(updatedDiagramJson));
+            policy.setStartLaneId(normalizeLaneId(bpmnStartLaneParser.extractStartLaneId(updatedDiagramJson)));
             policy.setLanes(lanes == null ? List.of() : lanes);
             policy.setUpdatedAt(LocalDateTime.now());
             return policyRepository.save(policy);
@@ -287,9 +291,20 @@ public class PolicyService {
             return "";
         }
         if (user.getLaneId() != null && !user.getLaneId().isBlank()) {
-            return user.getLaneId().trim();
+            return normalizeLaneId(user.getLaneId());
         }
-        return user.getArea() != null ? user.getArea().trim() : "";
+        return user.getArea() != null ? normalizeLaneId(user.getArea()) : "";
+    }
+
+    private String normalizeLaneId(String laneId) {
+        if (laneId == null) {
+            return "";
+        }
+        String normalized = laneId.trim();
+        if (LEGACY_CLIENT_LANE_ID.equalsIgnoreCase(normalized) || CLIENT_AREA_NAME.equalsIgnoreCase(normalized)) {
+            return CLIENT_AREA_NAME;
+        }
+        return normalized;
     }
 
     private String getLaneName(String laneId, List<Lane> lanes) {
