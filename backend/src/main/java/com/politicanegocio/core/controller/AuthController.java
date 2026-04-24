@@ -37,6 +37,17 @@ public class AuthController {
     public ResponseEntity<Map<String, Object>> login(@RequestBody LoginRequest request) {
         String token = authService.login(request.username(), request.password());
         User user = authService.getByUsername(request.username());
+        return ResponseEntity.ok(buildLoginResponse(user, token));
+    }
+
+    @PostMapping("/mobile/login")
+    public ResponseEntity<Map<String, Object>> loginMobile(@RequestBody LoginRequest request) {
+        String token = authService.loginForMobileClient(request.username(), request.password());
+        User user = authService.getByUsername(request.username());
+        return ResponseEntity.ok(buildLoginResponse(user, token));
+    }
+
+    private Map<String, Object> buildLoginResponse(User user, String token) {
         Map<String, Object> response = new HashMap<>();
         response.put("token", token);
         response.put("username", user.getUsername());
@@ -45,7 +56,7 @@ public class AuthController {
         response.put("parentCompany", Objects.toString(user.getParentCompany(), ""));
         response.put("area", Objects.toString(user.getArea(), ""));
         response.put("laneId", resolveLaneId(user));
-        return ResponseEntity.ok(response);
+        return response;
     }
 
     @GetMapping("/me")

@@ -15,7 +15,8 @@ public class Policy {
     private String id;
     private String name;
     private String description;
-    private String diagramJson; // Grafo serializado de JointJS
+    private String diagramJson; // Grafo serializado de JointJS o XML BPMN
+    private String startLaneId;
     private List<Lane> lanes = new ArrayList<>();
     private String companyId;
     private String companyName;
@@ -23,3 +24,4 @@ public class Policy {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
+

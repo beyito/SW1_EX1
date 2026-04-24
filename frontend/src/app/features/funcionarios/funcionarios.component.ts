@@ -1,12 +1,19 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, ChangeDetectorRef } from '@angular/core'; // 🚩 Importamos ChangeDetectorRef
 import { FormsModule } from '@angular/forms';
 import { AuthProfile, AuthService } from '../../auth.service';
 
 interface AreaInfo {
   id: string;
   name: string;
-  streets: string[];
+}
+
+interface UserInfo {
+  id: string;
+  username: string;
+  company: string;
+  area: string;
+  roles: string[];
 }
 
 @Component({
@@ -18,21 +25,38 @@ interface AreaInfo {
 })
 export class FuncionariosComponent implements OnInit {
   private readonly authService = inject(AuthService);
+  private readonly cdr = inject(ChangeDetectorRef); // 🚩 Inyectamos el detector
 
   public areas: AreaInfo[] = [];
+  public functionaries: UserInfo[] = [];
+  public clients: UserInfo[] = [];
+
   public newAreaName = '';
-  public newAreaStreets = '';
   public areaMessage = '';
   public areaLoading = false;
+  public editingAreaId: string | null = null;
+  public editingAreaName = '';
 
   public funcUsername = '';
   public funcPassword = '';
   public funcArea = '';
   public funcMessage = '';
   public funcLoading = false;
+  public editingFunctionaryId: string | null = null;
+  public editingFunctionaryUsername = '';
+  public editingFunctionaryPassword = '';
+  public editingFunctionaryArea = '';
+
+  public clientUsername = '';
+  public clientPassword = '';
+  public clientMessage = '';
+  public clientLoading = false;
+  public editingClientId: string | null = null;
+  public editingClientUsername = '';
+  public editingClientPassword = '';
 
   public async ngOnInit(): Promise<void> {
-    await this.loadAreas();
+    await this.loadData();
   }
 
   public get profile(): AuthProfile | null {
@@ -43,67 +67,161 @@ export class FuncionariosComponent implements OnInit {
     return this.authService.getToken();
   }
 
-  public get company(): string {
-    return this.profile?.company ?? '';
+  public get selectableAreas(): AreaInfo[] {
+    return this.areas.filter((area) => area.name.toLowerCase() !== 'cliente');
+  }
+
+  public async loadData(): Promise<void> {
+    await Promise.allSettled([this.loadAreas(), this.loadFunctionaries(), this.loadClients()]);
+    this.cdr.detectChanges(); // 🚩
   }
 
   public async loadAreas(): Promise<void> {
-    this.areaMessage = '';
-
     try {
-      const response = await fetch('/api/admin/areas', {
-        headers: this.authHeaders
-      });
-
+      const response = await fetch('/api/admin/areas', { headers: this.authHeaders });
       if (!response.ok) {
         throw new Error('No se pudieron cargar las areas');
       }
-
       this.areas = await response.json();
-      if (this.areas.length > 0) {
-        this.funcArea = this.areas[0].name;
+      if (!this.funcArea || !this.selectableAreas.some((area) => area.name === this.funcArea)) {
+        this.funcArea = this.selectableAreas[0]?.name ?? '';
       }
+      this.cdr.detectChanges(); // 🚩
     } catch (error) {
       this.areaMessage = error instanceof Error ? error.message : 'Error al cargar areas';
+      this.cdr.detectChanges(); // 🚩
+    }
+  }
+
+  public async loadFunctionaries(): Promise<void> {
+    try {
+      const response = await fetch('/api/admin/functionaries', { headers: this.authHeaders });
+      if (!response.ok) {
+        throw new Error('No se pudieron cargar los funcionarios');
+      }
+      this.functionaries = await response.json();
+      this.cdr.detectChanges(); // 🚩
+    } catch (error) {
+      this.funcMessage = error instanceof Error ? error.message : 'Error al cargar funcionarios';
+      this.cdr.detectChanges(); // 🚩
+    }
+  }
+
+  public async loadClients(): Promise<void> {
+    try {
+      const response = await fetch('/api/admin/clients', { headers: this.authHeaders });
+      if (!response.ok) {
+        throw new Error('No se pudieron cargar los clientes');
+      }
+      this.clients = await response.json();
+      this.cdr.detectChanges(); // 🚩
+    } catch (error) {
+      this.clientMessage = error instanceof Error ? error.message : 'Error al cargar clientes';
+      this.cdr.detectChanges(); // 🚩
     }
   }
 
   public async createArea(): Promise<void> {
     this.areaLoading = true;
     this.areaMessage = '';
+    this.cdr.detectChanges(); // 🚩
 
     try {
       const response = await fetch('/api/admin/areas', {
         method: 'POST',
         headers: this.authHeaders,
-        body: JSON.stringify({
-          name: this.newAreaName.trim(),
-          streets: this.newAreaStreets
-            .split(',')
-            .map((street) => street.trim())
-            .filter((street) => street)
-        })
+        body: JSON.stringify({ name: this.newAreaName.trim() })
       });
-
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(errorText || 'No se pudo crear el area');
       }
-
+      const createdArea = (await response.json()) as AreaInfo;
+      this.areas = [...this.areas, createdArea];
       this.newAreaName = '';
-      this.newAreaStreets = '';
       this.areaMessage = 'Area creada correctamente';
-      await this.loadAreas();
+      if (!this.funcArea && createdArea.name.toLowerCase() !== 'cliente') {
+        this.funcArea = createdArea.name;
+      }
     } catch (error) {
       this.areaMessage = error instanceof Error ? error.message : 'Error al crear area';
     } finally {
       this.areaLoading = false;
+      this.cdr.detectChanges(); // 🚩
+    }
+  }
+
+  public startEditArea(area: AreaInfo): void {
+    this.editingAreaId = area.id;
+    this.editingAreaName = area.name;
+    this.cdr.detectChanges(); // 🚩
+  }
+
+  public cancelEditArea(): void {
+    this.editingAreaId = null;
+    this.editingAreaName = '';
+    this.cdr.detectChanges(); // 🚩
+  }
+
+  public async saveArea(areaId: string): Promise<void> {
+    this.areaLoading = true;
+    this.areaMessage = '';
+    this.cdr.detectChanges(); // 🚩
+
+    try {
+      const response = await fetch(`/api/admin/areas/${areaId}`, {
+        method: 'PUT',
+        headers: this.authHeaders,
+        body: JSON.stringify({ name: this.editingAreaName.trim() })
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'No se pudo actualizar el area');
+      }
+      const updatedArea = (await response.json()) as AreaInfo;
+      this.areas = this.areas.map((area) => (area.id === areaId ? updatedArea : area));
+      this.areaMessage = 'Area actualizada correctamente';
+      this.cancelEditArea();
+      await this.loadFunctionaries();
+    } catch (error) {
+      this.areaMessage = error instanceof Error ? error.message : 'Error al actualizar area';
+    } finally {
+      this.areaLoading = false;
+      this.cdr.detectChanges(); // 🚩
+    }
+  }
+
+  public async deleteArea(areaId: string): Promise<void> {
+    this.areaLoading = true;
+    this.areaMessage = '';
+    this.cdr.detectChanges(); // 🚩
+
+    try {
+      const response = await fetch(`/api/admin/areas/${areaId}`, {
+        method: 'DELETE',
+        headers: this.authHeaders
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'No se pudo eliminar el area');
+      }
+      this.areas = this.areas.filter((area) => area.id !== areaId);
+      this.areaMessage = 'Area eliminada correctamente';
+      if (!this.selectableAreas.some((area) => area.name === this.funcArea)) {
+        this.funcArea = this.selectableAreas[0]?.name ?? '';
+      }
+    } catch (error) {
+      this.areaMessage = error instanceof Error ? error.message : 'Error al eliminar area';
+    } finally {
+      this.areaLoading = false;
+      this.cdr.detectChanges(); // 🚩
     }
   }
 
   public async createFunctionary(): Promise<void> {
     this.funcLoading = true;
     this.funcMessage = '';
+    this.cdr.detectChanges(); // 🚩
 
     try {
       const response = await fetch('/api/admin/functionaries', {
@@ -115,12 +233,12 @@ export class FuncionariosComponent implements OnInit {
           area: this.funcArea
         })
       });
-
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(errorText || 'No se pudo crear el funcionario');
       }
-
+      const createdFunctionary = (await response.json()) as UserInfo;
+      this.functionaries = [createdFunctionary, ...this.functionaries];
       this.funcUsername = '';
       this.funcPassword = '';
       this.funcMessage = 'Funcionario creado correctamente';
@@ -128,6 +246,178 @@ export class FuncionariosComponent implements OnInit {
       this.funcMessage = error instanceof Error ? error.message : 'Error al crear funcionario';
     } finally {
       this.funcLoading = false;
+      this.cdr.detectChanges(); // 🚩
+    }
+  }
+
+  public startEditFunctionary(func: UserInfo): void {
+    this.editingFunctionaryId = func.id;
+    this.editingFunctionaryUsername = func.username;
+    this.editingFunctionaryPassword = '';
+    this.editingFunctionaryArea = func.area;
+    this.cdr.detectChanges(); // 🚩
+  }
+
+  public cancelEditFunctionary(): void {
+    this.editingFunctionaryId = null;
+    this.editingFunctionaryUsername = '';
+    this.editingFunctionaryPassword = '';
+    this.editingFunctionaryArea = '';
+    this.cdr.detectChanges(); // 🚩
+  }
+
+  public async saveFunctionary(userId: string): Promise<void> {
+    this.funcLoading = true;
+    this.funcMessage = '';
+    this.cdr.detectChanges(); // 🚩
+
+    try {
+      const response = await fetch(`/api/admin/functionaries/${userId}`, {
+        method: 'PUT',
+        headers: this.authHeaders,
+        body: JSON.stringify({
+          username: this.editingFunctionaryUsername.trim(),
+          password: this.editingFunctionaryPassword.trim() || null,
+          area: this.editingFunctionaryArea
+        })
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'No se pudo actualizar el funcionario');
+      }
+      const updatedFunctionary = (await response.json()) as UserInfo;
+      this.functionaries = this.functionaries.map((func) => (func.id === userId ? updatedFunctionary : func));
+      this.funcMessage = 'Funcionario actualizado correctamente';
+      this.cancelEditFunctionary();
+    } catch (error) {
+      this.funcMessage = error instanceof Error ? error.message : 'Error al actualizar funcionario';
+    } finally {
+      this.funcLoading = false;
+      this.cdr.detectChanges(); // 🚩
+    }
+  }
+
+  public async deleteFunctionary(userId: string): Promise<void> {
+    this.funcLoading = true;
+    this.funcMessage = '';
+    this.cdr.detectChanges(); // 🚩
+
+    try {
+      const response = await fetch(`/api/admin/functionaries/${userId}`, {
+        method: 'DELETE',
+        headers: this.authHeaders
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'No se pudo eliminar el funcionario');
+      }
+      this.functionaries = this.functionaries.filter((func) => func.id !== userId);
+      this.funcMessage = 'Funcionario eliminado correctamente';
+    } catch (error) {
+      this.funcMessage = error instanceof Error ? error.message : 'Error al eliminar funcionario';
+    } finally {
+      this.funcLoading = false;
+      this.cdr.detectChanges(); // 🚩
+    }
+  }
+
+  public async createClient(): Promise<void> {
+    this.clientLoading = true;
+    this.clientMessage = '';
+    this.cdr.detectChanges(); // 🚩
+
+    try {
+      const response = await fetch('/api/admin/clients', {
+        method: 'POST',
+        headers: this.authHeaders,
+        body: JSON.stringify({
+          username: this.clientUsername.trim(),
+          password: this.clientPassword
+        })
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'No se pudo crear el cliente');
+      }
+      const createdClient = (await response.json()) as UserInfo;
+      this.clients = [createdClient, ...this.clients];
+      this.clientUsername = '';
+      this.clientPassword = '';
+      this.clientMessage = 'Cliente creado correctamente';
+    } catch (error) {
+      this.clientMessage = error instanceof Error ? error.message : 'Error al crear cliente';
+    } finally {
+      this.clientLoading = false;
+      this.cdr.detectChanges(); // 🚩
+    }
+  }
+
+  public startEditClient(client: UserInfo): void {
+    this.editingClientId = client.id;
+    this.editingClientUsername = client.username;
+    this.editingClientPassword = '';
+    this.cdr.detectChanges(); // 🚩
+  }
+
+  public cancelEditClient(): void {
+    this.editingClientId = null;
+    this.editingClientUsername = '';
+    this.editingClientPassword = '';
+    this.cdr.detectChanges(); // 🚩
+  }
+
+  public async saveClient(userId: string): Promise<void> {
+    this.clientLoading = true;
+    this.clientMessage = '';
+    this.cdr.detectChanges(); // 🚩
+
+    try {
+      const response = await fetch(`/api/admin/clients/${userId}`, {
+        method: 'PUT',
+        headers: this.authHeaders,
+        body: JSON.stringify({
+          username: this.editingClientUsername.trim(),
+          password: this.editingClientPassword.trim() || null,
+          area: null
+        })
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'No se pudo actualizar el cliente');
+      }
+      const updatedClient = (await response.json()) as UserInfo;
+      this.clients = this.clients.map((client) => (client.id === userId ? updatedClient : client));
+      this.clientMessage = 'Cliente actualizado correctamente';
+      this.cancelEditClient();
+    } catch (error) {
+      this.clientMessage = error instanceof Error ? error.message : 'Error al actualizar cliente';
+    } finally {
+      this.clientLoading = false;
+      this.cdr.detectChanges(); // 🚩
+    }
+  }
+
+  public async deleteClient(userId: string): Promise<void> {
+    this.clientLoading = true;
+    this.clientMessage = '';
+    this.cdr.detectChanges(); // 🚩
+
+    try {
+      const response = await fetch(`/api/admin/clients/${userId}`, {
+        method: 'DELETE',
+        headers: this.authHeaders
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'No se pudo eliminar el cliente');
+      }
+      this.clients = this.clients.filter((client) => client.id !== userId);
+      this.clientMessage = 'Cliente eliminado correctamente';
+    } catch (error) {
+      this.clientMessage = error instanceof Error ? error.message : 'Error al eliminar cliente';
+    } finally {
+      this.clientLoading = false;
+      this.cdr.detectChanges(); // 🚩
     }
   }
 
@@ -139,4 +429,3 @@ export class FuncionariosComponent implements OnInit {
     return headers;
   }
 }
-

@@ -1,31 +1,78 @@
 <section class="admin-shell">
   <div class="panel">
     <h2>Panel Admin de Software</h2>
-    <p>Desde aquí puedes crear nuevas empresas y asignar administradores para cada empresa.</p>
+    <p>Gestiona empresas y administradores de empresa de forma centralizada.</p>
 
     <div class="panel-card">
       <h3>Crear empresa</h3>
       <label>Nombre de empresa</label>
       <input type="text" [(ngModel)]="newCompanyName" placeholder="Nombre de empresa" />
       <button type="button" (click)="createCompany()" [disabled]="companyLoading">Crear empresa</button>
-      <p class="message" *ngIf="companyMessage">{{ companyMessage }}</p>
+      @if (companyMessage) {
+        <p class="message">{{ companyMessage }}</p>
+      }
     </div>
 
     <div class="panel-card">
       <h3>Crear administrador de empresa</h3>
       <label>Empresa</label>
       <select [(ngModel)]="adminCompany">
-        <option *ngFor="let company of companies" [value]="company.name">{{ company.name }}</option>
+        @for (company of companies; track company.id) {
+          <option [value]="company.name">{{ company.name }}</option>
+        }
       </select>
 
       <label>Usuario</label>
       <input type="text" [(ngModel)]="adminUsername" placeholder="Nombre de usuario" />
 
-      <label>Contraseña</label>
-      <input type="password" [(ngModel)]="adminPassword" placeholder="Contraseña" />
+      <label>Contrasena</label>
+      <input type="password" [(ngModel)]="adminPassword" placeholder="Contrasena" />
 
       <button type="button" (click)="createCompanyAdmin()" [disabled]="adminLoading">Crear admin de empresa</button>
-      <p class="message" *ngIf="adminMessage">{{ adminMessage }}</p>
+      @if (adminMessage) {
+        <p class="message">{{ adminMessage }}</p>
+      }
+    </div>
+
+    <div class="panel-card">
+      <h3>Administradores registrados</h3>
+      @if (companyAdmins.length === 0) {
+        <p class="hint">No hay administradores registrados todavia.</p>
+      } @else {
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Usuario</th>
+              <th>Empresa</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (admin of companyAdmins; track admin.id) {
+              <tr>
+                <td>
+                  @if (editingAdminId === admin.id) {
+                    <input type="text" [(ngModel)]="editingAdminUsername" placeholder="Usuario" />
+                  } @else {
+                    {{ admin.username }}
+                  }
+                </td>
+                <td>{{ admin.company }}</td>
+                <td class="actions-cell">
+                  @if (editingAdminId === admin.id) {
+                    <input type="password" [(ngModel)]="editingAdminPassword" placeholder="Nueva contrasena (opcional)" />
+                    <button type="button" class="btn-secondary" (click)="saveAdmin(admin.id)" [disabled]="adminLoading">Guardar</button>
+                    <button type="button" class="btn-secondary" (click)="cancelEditAdmin()" [disabled]="adminLoading">Cancelar</button>
+                  } @else {
+                    <button type="button" class="btn-secondary" (click)="startEditAdmin(admin)">Editar</button>
+                    <button type="button" class="btn-danger" (click)="deleteAdmin(admin.id)" [disabled]="adminLoading">Eliminar</button>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
     </div>
   </div>
 </section>

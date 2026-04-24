@@ -9,6 +9,7 @@ import com.politicanegocio.core.model.TaskExecutionOrder;
 import com.politicanegocio.core.model.TaskOrder;
 import com.politicanegocio.core.model.User;
 import com.politicanegocio.core.repository.PolicyRepository;
+import com.politicanegocio.core.util.BpmnStartLaneParser;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -19,11 +20,16 @@ import java.util.*;
 @Service
 public class PolicyService {
 
+    private static final String CLIENT_ROLE = "CLIENT";
+    private static final String CLIENT_START_LANE_ID = "lane_cliente";
+
     private final PolicyRepository policyRepository;
+    private final BpmnStartLaneParser bpmnStartLaneParser;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public PolicyService(PolicyRepository policyRepository) {
+    public PolicyService(PolicyRepository policyRepository, BpmnStartLaneParser bpmnStartLaneParser) {
         this.policyRepository = policyRepository;
+        this.bpmnStartLaneParser = bpmnStartLaneParser;
     }
 
    public Policy createPolicy(String name, String description) {
@@ -35,6 +41,7 @@ public class PolicyService {
             policy.setName(name);
             policy.setDescription(description);
             policy.setDiagramJson("{\"cells\":[]}");
+            policy.setStartLaneId(bpmnStartLaneParser.extractStartLaneId(policy.getDiagramJson()));
             policy.setCompanyId(currentUser.getCompany());
             policy.setCompanyName(currentUser.getParentCompany());
             policy.setCreatedBy(currentUser.getUsername());
@@ -60,21 +67,21 @@ public class PolicyService {
         if (user == null) {
             return List.of();
         }
+
+        String companyId = user.getCompany();
+        if (companyId == null || companyId.isBlank()) {
+            return List.of();
+        }
+
+        if (user.getRoles() != null && user.getRoles().contains(CLIENT_ROLE)) {
+            return policyRepository.findByCompanyIdAndStartLaneId(companyId, CLIENT_START_LANE_ID);
+        }
+
         String userLaneId = resolveUserLaneId(user);
         if (userLaneId.isBlank()) {
             return List.of();
         }
-
-        List<Policy> companyPolicies = policyRepository.findByCompanyId(user.getCompany());
-        List<Policy> startablePolicies = new ArrayList<>();
-
-        for (Policy policy : companyPolicies) {
-            String startLaneId = extractStartLaneId(policy.getDiagramJson());
-            if (userLaneId.equals(startLaneId)) {
-                startablePolicies.add(policy);
-            }
-        }
-        return startablePolicies;
+        return policyRepository.findByCompanyIdAndStartLaneId(companyId, userLaneId);
     }
 
     public boolean canUserStartPolicy(User user, Policy policy) {
@@ -85,8 +92,7 @@ public class PolicyService {
         if (userLaneId.isBlank()) {
             return false;
         }
-        String startLaneId = extractStartLaneId(policy.getDiagramJson());
-        return userLaneId.equals(startLaneId);
+        return userLaneId.equals(Objects.toString(policy.getStartLaneId(), ""));
     }
 
     public Policy getPolicyById(String id) {
@@ -125,6 +131,7 @@ public class PolicyService {
 
             String updatedDiagramJson = objectMapper.writeValueAsString(rootNode);
             policy.setDiagramJson(updatedDiagramJson);
+            policy.setStartLaneId(bpmnStartLaneParser.extractStartLaneId(updatedDiagramJson));
             policy.setLanes(lanes == null ? List.of() : lanes);
             policy.setUpdatedAt(LocalDateTime.now());
             return policyRepository.save(policy);
@@ -283,30 +290,6 @@ public class PolicyService {
             return user.getLaneId().trim();
         }
         return user.getArea() != null ? user.getArea().trim() : "";
-    }
-
-    private String extractStartLaneId(String diagramJson) {
-        if (diagramJson == null || diagramJson.isBlank()) {
-            return "";
-        }
-        try {
-            JsonNode rootNode = objectMapper.readTree(diagramJson);
-            JsonNode cellsNode = rootNode.path("cells");
-            if (!cellsNode.isArray()) {
-                return "";
-            }
-            for (JsonNode cell : cellsNode) {
-                if (!isWorkflowNode(cell)) {
-                    continue;
-                }
-                if ("START".equals(cell.path("nodeType").asText())) {
-                    return cell.path("laneId").asText("");
-                }
-            }
-            return "";
-        } catch (Exception exception) {
-            return "";
-        }
     }
 
     private String getLaneName(String laneId, List<Lane> lanes) {

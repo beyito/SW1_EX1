@@ -7,8 +7,11 @@ import com.politicanegocio.core.service.AdminService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -47,12 +50,50 @@ public class AdminController {
         return ResponseEntity.ok(createdUser);
     }
 
+    @GetMapping("/company-admins")
+    @PreAuthorize("hasAuthority('SOFTWARE_ADMIN')")
+    public ResponseEntity<List<User>> listCompanyAdmins() {
+        return ResponseEntity.ok(adminService.listCompanyAdmins());
+    }
+
+    @PutMapping("/company-admins/{userId}")
+    @PreAuthorize("hasAuthority('SOFTWARE_ADMIN')")
+    public ResponseEntity<User> updateCompanyAdmin(@PathVariable String userId, @RequestBody UpdateUserRequest request, Authentication authentication) {
+        User user = getCurrentUser(authentication);
+        User updated = adminService.updateCompanyAdmin(userId, request.username(), request.password(), user);
+        return ResponseEntity.ok(updated);
+    }
+
+    @DeleteMapping("/company-admins/{userId}")
+    @PreAuthorize("hasAuthority('SOFTWARE_ADMIN')")
+    public ResponseEntity<Void> deleteCompanyAdmin(@PathVariable String userId, Authentication authentication) {
+        User user = getCurrentUser(authentication);
+        adminService.deleteCompanyAdmin(userId, user);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/areas")
     @PreAuthorize("hasAuthority('COMPANY_ADMIN')")
     public ResponseEntity<Area> createArea(@RequestBody CreateAreaRequest request, Authentication authentication) {
         User user = getCurrentUser(authentication);
-        Area area = adminService.createArea(request.name(), user.getCompany(), request.streets(), user);
+        Area area = adminService.createArea(request.name(), user.getCompany(), user);
         return ResponseEntity.ok(area);
+    }
+
+    @PutMapping("/areas/{areaId}")
+    @PreAuthorize("hasAuthority('COMPANY_ADMIN')")
+    public ResponseEntity<Area> updateArea(@PathVariable String areaId, @RequestBody UpdateAreaRequest request, Authentication authentication) {
+        User user = getCurrentUser(authentication);
+        Area updated = adminService.updateArea(areaId, user.getCompany(), request.name(), user);
+        return ResponseEntity.ok(updated);
+    }
+
+    @DeleteMapping("/areas/{areaId}")
+    @PreAuthorize("hasAuthority('COMPANY_ADMIN')")
+    public ResponseEntity<Void> deleteArea(@PathVariable String areaId, Authentication authentication) {
+        User user = getCurrentUser(authentication);
+        adminService.deleteArea(areaId, user.getCompany(), user);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/areas")
@@ -70,11 +111,58 @@ public class AdminController {
         return ResponseEntity.ok(createdUser);
     }
 
+    @PutMapping("/functionaries/{userId}")
+    @PreAuthorize("hasAuthority('COMPANY_ADMIN')")
+    public ResponseEntity<User> updateFunctionary(@PathVariable String userId, @RequestBody UpdateUserRequest request, Authentication authentication) {
+        User user = getCurrentUser(authentication);
+        User updated = adminService.updateFunctionary(userId, user.getCompany(), request.username(), request.password(), request.area(), user);
+        return ResponseEntity.ok(updated);
+    }
+
+    @DeleteMapping("/functionaries/{userId}")
+    @PreAuthorize("hasAuthority('COMPANY_ADMIN')")
+    public ResponseEntity<Void> deleteFunctionary(@PathVariable String userId, Authentication authentication) {
+        User user = getCurrentUser(authentication);
+        adminService.deleteFunctionary(userId, user.getCompany(), user);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/functionaries")
     @PreAuthorize("hasAuthority('COMPANY_ADMIN')")
     public ResponseEntity<List<User>> listFunctionaries(Authentication authentication) {
         User user = getCurrentUser(authentication);
         return ResponseEntity.ok(adminService.listCompanyFunctionaries(user.getCompany()));
+    }
+
+    @PostMapping("/clients")
+    @PreAuthorize("hasAuthority('COMPANY_ADMIN')")
+    public ResponseEntity<User> createClient(@RequestBody CreateClientRequest request, Authentication authentication) {
+        User user = getCurrentUser(authentication);
+        User createdUser = adminService.createClient(request.username(), request.password(), user.getCompany(), user);
+        return ResponseEntity.ok(createdUser);
+    }
+
+    @PutMapping("/clients/{userId}")
+    @PreAuthorize("hasAuthority('COMPANY_ADMIN')")
+    public ResponseEntity<User> updateClient(@PathVariable String userId, @RequestBody UpdateUserRequest request, Authentication authentication) {
+        User user = getCurrentUser(authentication);
+        User updated = adminService.updateClient(userId, user.getCompany(), request.username(), request.password(), user);
+        return ResponseEntity.ok(updated);
+    }
+
+    @DeleteMapping("/clients/{userId}")
+    @PreAuthorize("hasAuthority('COMPANY_ADMIN')")
+    public ResponseEntity<Void> deleteClient(@PathVariable String userId, Authentication authentication) {
+        User user = getCurrentUser(authentication);
+        adminService.deleteClient(userId, user.getCompany(), user);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/clients")
+    @PreAuthorize("hasAuthority('COMPANY_ADMIN')")
+    public ResponseEntity<List<User>> listClients(Authentication authentication) {
+        User user = getCurrentUser(authentication);
+        return ResponseEntity.ok(adminService.listCompanyClients(user.getCompany()));
     }
 
     private User getCurrentUser(Authentication authentication) {
@@ -85,7 +173,16 @@ public class AdminController {
     }
 
     private record CreateCompanyRequest(String name) {}
+
     private record CreateCompanyAdminRequest(String username, String password, String company) {}
-    private record CreateAreaRequest(String name, List<String> streets) {}
+
+    private record CreateAreaRequest(String name) {}
+
+    private record UpdateAreaRequest(String name) {}
+
     private record CreateFunctionaryRequest(String username, String password, String area) {}
+
+    private record CreateClientRequest(String username, String password) {}
+
+    private record UpdateUserRequest(String username, String password, String area) {}
 }
