@@ -1,0 +1,138 @@
+# Despliegue en AWS EC2 (Docker) - BPMN Platform
+
+Esta guía deja tu proyecto listo para desplegar en una instancia EC2 con Docker Compose, manteniendo Backend (Spring Boot), Frontend (Angular+Nginx), RabbitMQ y PostgreSQL en contenedores.
+
+## 1) Requisitos previos
+- Cuenta AWS con permisos para EC2, Security Groups, IAM y (opcional) Route53.
+- Par de llaves SSH (`.pem`) para acceso a EC2.
+- Dominio (opcional pero recomendado para HTTPS).
+
+## 2) Preparar EC2
+1. Crear una instancia EC2 (Ubuntu 22.04 LTS recomendado).
+2. Tipo sugerido inicial: `t3.medium` (o mayor según carga).
+3. Security Group (entrantes):
+   - `22` (SSH): solo tu IP.
+   - `80` (HTTP): 0.0.0.0/0.
+   - `443` (HTTPS): 0.0.0.0/0.
+   - Opcional temporal para diagnóstico:
+     - `15672` (RabbitMQ UI) restringido a tu IP.
+4. Conectarte por SSH:
+
+```bash
+ssh -i /ruta/tu-clave.pem ubuntu@<EC2_PUBLIC_IP>
+```
+
+## 3) Instalar Docker y Compose plugin
+```bash
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl gnupg
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release && echo $VERSION_CODENAME) stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+## 4) Clonar proyecto en EC2
+```bash
+git clone <TU_REPO_GIT>
+cd <TU_REPO>/infra
+```
+
+## 5) Variables de entorno
+1. Crear `.env` desde plantilla:
+```bash
+cp .env.example .env
+nano .env
+```
+2. Completar valores reales:
+- `MONGODB_URI`: conexión real a MongoDB Atlas/servidor.
+- `AWS_REGION`, `AWS_S3_BUCKET`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`.
+- `APP_PUBLIC_BASE_URL`: `http://<dominio>` o `https://<dominio>`.
+- RabbitMQ credentials si no usarás `guest/guest`.
+
+Importante:
+- No subir `.env` al repositorio.
+- Rotar inmediatamente cualquier credencial que se haya expuesto previamente.
+
+## 6) Build y arranque
+Desde `infra/`:
+
+```bash
+docker compose build --no-cache
+docker compose up -d
+```
+
+Verificar:
+```bash
+docker compose ps
+docker compose logs -f backend
+docker compose logs -f frontend
+```
+
+## 7) Accesos esperados
+- Frontend: `http://<EC2_PUBLIC_IP>:4200` (con compose actual).
+- API detrás de Nginx frontend: `http://<EC2_PUBLIC_IP>:4200/api/...`.
+- RabbitMQ UI (si expuesto): `http://<EC2_PUBLIC_IP>:15672`.
+
+## 8) Recomendación de producción (muy importante)
+Con tu `docker-compose.yml` actual estás exponiendo puertos internos de backend/postgres/rabbitmq al host. Para producción real:
+- Exponer públicamente solo `80/443` del frontend (Nginx).
+- Quitar exposición pública de `8080`, `5432`, `5672`, `61613`, `15672`.
+- Mantener comunicación interna por la red Docker (`bpmn-net`).
+
+## 9) HTTPS con Nginx + Certbot (opcional recomendado)
+Opciones:
+1. Terminar TLS en un ALB (AWS Load Balancer) y pasar HTTP a EC2.
+2. Terminar TLS dentro de EC2 con Certbot + Nginx.
+
+Si usas dominio, apunta DNS (A record) al IP público o al ALB.
+
+## 10) Escalado y operación
+- WebSockets colaborativos ya usan STOMP relay con RabbitMQ, útil para escalar backend horizontalmente.
+- Si escalas a múltiples instancias EC2/Fargate, centraliza RabbitMQ (servicio administrado o clúster dedicado).
+- Logs:
+```bash
+docker compose logs -f backend
+docker compose logs -f rabbitmq
+```
+- Reinicio:
+```bash
+docker compose restart backend frontend
+```
+- Actualización de versión:
+```bash
+git pull
+docker compose build
+docker compose up -d
+```
+
+## 11) Checklist rápido pre-producción
+- [ ] `.env` completo y sin secretos hardcodeados en código.
+- [ ] Credenciales AWS rotadas y con permisos mínimos.
+- [ ] Security Group restringido (sin puertos innecesarios públicos).
+- [ ] Backups de MongoDB habilitados.
+- [ ] HTTPS activo (dominio + certificado).
+- [ ] Monitoreo/logs centralizados.
+
+## 12) Variables de entorno usadas por el backend
+- `APP_NAME`: nombre de la app Spring.
+- `APP_PUBLIC_BASE_URL`: URL pública usada por app/config.
+- `MONGODB_URI`: conexión principal MongoDB.
+- `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`: soporte SQL local/futuro.
+- `SPRING_RABBITMQ_HOST`: host del broker relay.
+- `SPRING_RABBITMQ_STOMP_PORT`: puerto STOMP (61613 por defecto).
+- `SPRING_RABBITMQ_USERNAME`, `SPRING_RABBITMQ_PASSWORD`: credenciales del relay.
+- `AWS_REGION`: región AWS para S3.
+- `AWS_S3_BUCKET`: bucket de archivos adjuntos.
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`: credenciales IAM para subir archivos.
+- `MAX_UPLOAD_SIZE`, `MAX_REQUEST_SIZE`: límites de subida HTTP multipart.
+- `JAVA_OPTS`: memoria y flags JVM.
