@@ -12,7 +12,7 @@ class AuthService {
   Future<void> login({required String username, required String password}) async {
     try {
       final response = await _apiClient.dio.post(
-        '/api/auth/login',
+        '/api/auth/mobile/login',
         data: {'username': username.trim(), 'password': password},
       );
 
@@ -23,10 +23,9 @@ class AuthService {
 
       await _storageService.saveAuthToken(token);
     } on DioException catch (error) {
-      final backendMessage = error.response?.data is Map
-          ? (error.response?.data['message']?.toString() ?? '')
-          : '';
-      throw Exception(backendMessage.isNotEmpty ? backendMessage : 'No se pudo iniciar sesion.');
+      throw Exception(_mapDioError(error));
+    } catch (_) {
+      throw Exception('No se pudo iniciar sesion. Intenta nuevamente.');
     }
   }
 
@@ -37,5 +36,39 @@ class AuthService {
 
   Future<void> logout() async {
     await _storageService.clearAuthToken();
+  }
+
+  String _mapDioError(DioException error) {
+    if (error.type == DioExceptionType.connectionTimeout ||
+        error.type == DioExceptionType.receiveTimeout ||
+        error.type == DioExceptionType.sendTimeout) {
+      return 'La conexion tardo demasiado. Verifica tu internet e intenta nuevamente.';
+    }
+
+    if (error.type == DioExceptionType.connectionError) {
+      return 'No se pudo conectar con el servidor.';
+    }
+
+    final data = error.response?.data;
+    if (data is Map<String, dynamic>) {
+      final message = data['message']?.toString().trim();
+      final errorText = data['error']?.toString().trim();
+      if (message != null && message.isNotEmpty) {
+        return message;
+      }
+      if (errorText != null && errorText.isNotEmpty) {
+        return errorText;
+      }
+    }
+
+    if (data is String && data.trim().isNotEmpty) {
+      return data;
+    }
+
+    if (error.response?.statusCode == 401) {
+      return 'Credenciales invalidas o usuario no autorizado para la app movil.';
+    }
+
+    return 'No se pudo iniciar sesion.';
   }
 }

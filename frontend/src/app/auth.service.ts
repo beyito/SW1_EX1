@@ -37,7 +37,8 @@ export class AuthService {
     return this.profile;
   }
 
-  public async login(username: string, password: string): Promise<AuthProfile> {
+  // auth.service.ts
+public async login(username: string, password: string): Promise<AuthProfile> {
     const response = await fetch('/api/auth/login', {
       method: 'POST',
       headers: {
@@ -47,14 +48,24 @@ export class AuthService {
     });
 
     if (!response.ok) {
+      // Si Spring Boot lanza el 401 (Credenciales invalidas)
       throw new Error('Usuario o contraseña incorrectos');
     }
 
     const data = await response.json();
+    
+    // 🚨 NUEVO: BLOQUEO DE ROL CLIENTE
+    // Asegurarnos de que no sea null o undefined
+    const roles: string[] = data.roles || []; 
+    // Verifica si tiene el rol CLIENT (o ROLE_CLIENT dependiendo de cómo lo mande tu Spring)
+    if (roles.includes('CLIENT') || roles.includes('ROLE_CLIENT')) {
+      throw new Error('Acceso denegado: Usa la aplicación móvil para iniciar sesión.');
+    }
+
     localStorage.setItem(AUTH_TOKEN_KEY, data.token);
     const profile: AuthProfile = {
       username: data.username,
-      roles: data.roles || [],
+      roles: roles,
       company: data.company || '',
       parentCompany: data.parentCompany || '',
       area: data.area || '',
@@ -63,7 +74,7 @@ export class AuthService {
     this.profile = profile;
     localStorage.setItem(AUTH_PROFILE_KEY, JSON.stringify(profile));
     return profile;
-  }
+}
 
   public logout(): void {
     localStorage.removeItem(AUTH_TOKEN_KEY);

@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
+import { Component, ChangeDetectorRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../auth.service';
 import { Router } from '@angular/router';
@@ -26,7 +26,8 @@ export class LoginComponent {
   // 1. INYECCIÓN DE DEPENDENCIAS (La forma correcta en Angular)
   constructor(
     private authService: AuthService,
-    private router: Router
+    private router: Router,
+    private cdr: ChangeDetectorRef
   ) {}
 
   public get isLoggedIn(): boolean {
@@ -59,6 +60,7 @@ export class LoginComponent {
       this.message = (error instanceof Error ? error.message : 'Error de autenticación');
     } finally {
       this.loading = false;
+      this.cdr.detectChanges();
     }
   }
 
