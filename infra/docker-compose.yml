@@ -5,7 +5,10 @@ services:
       dockerfile: frontend/Dockerfile
     container_name: bpmn-frontend
     ports:
-      - "4200:80"
+      - "80:80"
+      - "443:443"      # <-- NUEVO: Abrimos el puerto HTTPS
+    volumes:           # <-- NUEVO: Le pasamos los certificados al contenedor
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       - backend
     networks:
