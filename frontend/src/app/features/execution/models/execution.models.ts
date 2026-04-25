@@ -21,6 +21,7 @@ export interface TaskInstance {
   assignedTo?: string | null;
   formData?: string | null;
   createdAt: string;
+  startedAt?: string | null;
   completedAt?: string | null;
 }
 

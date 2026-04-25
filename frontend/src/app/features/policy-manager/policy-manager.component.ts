@@ -76,4 +76,8 @@ export class PolicyManagerComponent implements OnInit {
   public async editDiagram(policyId: string): Promise<void> {
     await this.router.navigate(['/designer', policyId]);
   }
+
+  public async viewMetrics(policyId: string): Promise<void> {
+    await this.router.navigate(['/admin/policies', policyId, 'metrics']);
+  }
 }

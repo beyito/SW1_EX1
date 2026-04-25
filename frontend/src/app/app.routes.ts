@@ -4,6 +4,7 @@ import { AdminSoftwareComponent } from './features/admin-software/admin-software
 import { AdminLayoutComponent } from './features/admin-layout/admin-layout.component';
 import { FuncionariosComponent } from './features/funcionarios/funcionarios.component';
 import { PolicyManagerComponent } from './features/policy-manager/policy-manager.component';
+import { PolicyMetricsComponent } from './features/policy-manager/policy-metrics/policy-metrics.component';
 import { PolicyDesignerComponent } from './features/policy-designer/components/policy-designer/policy-designer.component';
 import { TaskInboxComponent } from './features/execution/components/task-inbox/task-inbox.component';
 import { FuncionarioDashboardComponent } from './features/execution/components/funcionario-dashboard/funcionario-dashboard.component';
@@ -27,6 +28,7 @@ export const routes: Routes = [
     children: [
       { path: 'funcionarios', component: FuncionariosComponent },
       { path: 'policies', component: PolicyManagerComponent },
+      { path: 'policies/:policyId/metrics', component: PolicyMetricsComponent },
       { path: '', redirectTo: 'funcionarios', pathMatch: 'full' }
     ]
   },

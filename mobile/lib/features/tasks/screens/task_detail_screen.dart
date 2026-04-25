@@ -95,7 +95,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     });
 
     try {
-      await widget.taskService.takeTask(detail.id);
+      if (detail.status == 'PENDING') {
+        await widget.taskService.takeTask(detail.id);
+      }
       await widget.taskService.completeTask(detail.id, Map<String, dynamic>.from(_formValues));
       if (!mounted) {
         return;

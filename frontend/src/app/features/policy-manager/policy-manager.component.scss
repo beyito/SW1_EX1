@@ -78,6 +78,46 @@ button:disabled {
   margin-bottom: 10px;
 }
 
+.actions-cell {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.metrics-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.metrics-icon {
+  width: 14px;
+  height: 14px;
+  position: relative;
+  display: inline-block;
+  border-bottom: 2px solid currentColor;
+
+  &::before,
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    width: 3px;
+    background: currentColor;
+    border-radius: 2px 2px 0 0;
+  }
+
+  &::before {
+    left: 3px;
+    height: 8px;
+  }
+
+  &::after {
+    left: 8px;
+    height: 11px;
+  }
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

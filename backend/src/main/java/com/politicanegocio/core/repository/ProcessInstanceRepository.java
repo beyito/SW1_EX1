@@ -7,6 +7,7 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 import java.util.List;
 
 public interface ProcessInstanceRepository extends MongoRepository<ProcessInstance, String> {
+    List<ProcessInstance> findByPolicyId(String policyId);
     List<ProcessInstance> findByStartedBy(String startedBy);
     List<ProcessInstance> findByStartedByOrderByStartedAtDesc(String startedBy);
     List<ProcessInstance> findByStatusOrderByStartedAtDesc(ProcessInstanceStatus status);

@@ -102,6 +102,9 @@ public class ProcessExecutionService {
         if (taskInstance.getStatus() != TaskInstanceStatus.IN_PROGRESS) {
             throw new RuntimeException("Solo se pueden completar tareas en estado IN_PROGRESS");
         }
+        if (taskInstance.getStartedAt() == null) {
+            throw new RuntimeException("La tarea no tiene fecha de inicio registrada");
+        }
         if (taskInstance.getAssignedTo() != null && !taskInstance.getAssignedTo().equals(username)) {
             throw new RuntimeException("La tarea esta siendo ejecutada por otro usuario");
         }
@@ -156,7 +159,9 @@ public class ProcessExecutionService {
         taskInstance.setStatus(TaskInstanceStatus.COMPLETED);
         taskInstance.setAssignedTo(username);
         taskInstance.setFormData(formData);
-        taskInstance.setCompletedAt(LocalDateTime.now());
+        if (taskInstance.getStartedAt() != null) {
+            taskInstance.setCompletedAt(LocalDateTime.now());
+        }
         TaskInstance completedTask = taskInstanceRepository.save(taskInstance);
 
         ProcessInstance processInstance = processInstanceRepository.findById(taskInstance.getProcessInstanceId())
@@ -175,28 +180,24 @@ public class ProcessExecutionService {
         return completedTask;
     }
 
-    public TaskInstance takeTask(String taskInstanceId, User user) {
+    public TaskInstance startTask(String taskInstanceId, User user) {
         TaskInstance taskInstance = taskInstanceRepository.findById(taskInstanceId)
                 .orElseThrow(() -> new RuntimeException("Tarea no encontrada con ID: " + taskInstanceId));
         assertUserCanAccessTask(user, taskInstance);
         String username = user.getUsername();
 
-        if (taskInstance.getStatus() == TaskInstanceStatus.COMPLETED) {
-            throw new RuntimeException("La tarea ya fue completada");
-        }
-        if (taskInstance.getStatus() == TaskInstanceStatus.IN_PROGRESS) {
-            if (username.equals(taskInstance.getAssignedTo())) {
-                return taskInstance;
-            }
-            throw new RuntimeException("La tarea ya fue tomada por otro usuario");
-        }
         if (taskInstance.getStatus() != TaskInstanceStatus.PENDING) {
-            throw new RuntimeException("La tarea no puede ser tomada en su estado actual");
+            throw new RuntimeException("Solo se pueden iniciar tareas en estado PENDING");
         }
 
         taskInstance.setStatus(TaskInstanceStatus.IN_PROGRESS);
         taskInstance.setAssignedTo(username);
+        taskInstance.setStartedAt(LocalDateTime.now());
         return taskInstanceRepository.save(taskInstance);
+    }
+
+    public TaskInstance takeTask(String taskInstanceId, User user) {
+        return startTask(taskInstanceId, user);
     }
 
     public List<PendingTaskDto> getPendingTasksForLane(String laneId) {
@@ -547,6 +548,7 @@ public class ProcessExecutionService {
                                 task.getLaneId(),
                                 task.getStatus(),
                                 task.getCreatedAt(),
+                                task.getStartedAt(),
                                 task.getCompletedAt()
                         );
                     })

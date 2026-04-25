@@ -45,7 +45,7 @@
             <tr>
               <th>Nombre</th>
               <th>Descripcion</th>
-              <th>Accion</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -53,8 +53,12 @@
               <tr>
                 <td>{{ policy.name }}</td>
                 <td>{{ policy.description || 'Sin descripcion' }}</td>
-                <td>
+                <td class="actions-cell">
                   <button type="button" (click)="editDiagram(policy.id)">Editar Diagrama</button>
+                  <button type="button" class="btn-secondary metrics-btn" (click)="viewMetrics(policy.id)">
+                    <span class="metrics-icon" aria-hidden="true"></span>
+                    Ver Metricas
+                  </button>
                 </td>
               </tr>
             }

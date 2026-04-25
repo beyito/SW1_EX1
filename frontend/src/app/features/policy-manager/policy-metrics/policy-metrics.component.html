@@ -1,0 +1,65 @@
+<section class="metrics-shell">
+  <header class="metrics-header">
+    <div>
+      <h2>Metricas SLA por Politica</h2>
+      <p>Politica: {{ policyId }}</p>
+    </div>
+    <div class="header-actions">
+      <button type="button" class="btn-secondary" (click)="loadMetrics()" [disabled]="loading">
+        Recargar
+      </button>
+      <button type="button" (click)="goBack()">Volver</button>
+    </div>
+  </header>
+
+  @if (loading) {
+    <div class="card">
+      <p class="muted">Calculando metricas...</p>
+    </div>
+  } @else {
+    @if (message) {
+      <div class="card">
+        <p class="message">{{ message }}</p>
+      </div>
+    }
+
+    @if (metrics.length > 0) {
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>Nodo</th>
+              <th>Completadas</th>
+              <th>Espera Promedio</th>
+              <th>Ejecucion Promedio</th>
+              <th>Total Promedio</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (metric of metrics; track metric.taskId) {
+              <tr [class.bottleneck-row]="isBottleneck(metric)">
+                <td>
+                  <strong>{{ metric.taskName }}</strong>
+                  <div class="task-id">{{ metric.taskId }}</div>
+                  @if (isBottleneck(metric)) {
+                    <span class="bottleneck-badge">Cuello de botella</span>
+                  }
+                </td>
+                <td>{{ metric.totalCompleted }}</td>
+                <td>
+                  <div class="value">{{ metric.avgWaitMinutes | number: '1.0-2' }} min</div>
+                  <div class="bar bar-wait" [style.width]="waitBarWidth(metric)"></div>
+                </td>
+                <td>
+                  <div class="value">{{ metric.avgExecutionMinutes | number: '1.0-2' }} min</div>
+                  <div class="bar bar-exec" [style.width]="executionBarWidth(metric)"></div>
+                </td>
+                <td>{{ metric.avgTotalMinutes | number: '1.0-2' }} min</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+</section>

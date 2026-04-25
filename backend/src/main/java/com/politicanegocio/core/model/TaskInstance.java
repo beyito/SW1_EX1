@@ -18,5 +18,6 @@ public class TaskInstance {
     private String assignedTo;
     private String formData;
     private LocalDateTime createdAt;
+    private LocalDateTime startedAt;
     private LocalDateTime completedAt;
 }

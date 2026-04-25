@@ -66,7 +66,16 @@ public class ProcessExecutionController {
             Authentication authentication
     ) {
         User user = getCurrentUser(authentication);
-        return ResponseEntity.ok(processExecutionService.takeTask(taskInstanceId, user));
+        return ResponseEntity.ok(processExecutionService.startTask(taskInstanceId, user));
+    }
+
+    @PostMapping("/tasks/{taskInstanceId}/start")
+    public ResponseEntity<TaskInstance> startTask(
+            @PathVariable String taskInstanceId,
+            Authentication authentication
+    ) {
+        User user = getCurrentUser(authentication);
+        return ResponseEntity.ok(processExecutionService.startTask(taskInstanceId, user));
     }
 
     @GetMapping("/tasks/{taskInstanceId}")

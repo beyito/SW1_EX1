@@ -17,5 +17,6 @@ public class ProcessTaskDto {
     private String laneId;
     private TaskInstanceStatus status;
     private LocalDateTime createdAt;
+    private LocalDateTime startedAt;
     private LocalDateTime completedAt;
 }
