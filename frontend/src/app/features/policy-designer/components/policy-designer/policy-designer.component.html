@@ -263,6 +263,13 @@
     (dragover)="onCanvasDragOver($event)"
     (dragleave)="onCanvasDragLeave()"
     (drop)="onCanvasDrop($event)"></main>
+
+  <app-copilot-chat
+    [messages]="copilotMessages"
+    [loading]="copilotLoading"
+    (messageSubmitted)="onCopilotMessageSubmitted($event)"
+    (analyzeRequested)="onCopilotAnalyzeRequested()">
+  </app-copilot-chat>
 </div>
 
 

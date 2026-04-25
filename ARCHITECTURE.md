@@ -8,6 +8,10 @@
 |   |-- src/
 |   |-- pom.xml
 |   `-- Dockerfile
+|-- bpmn-ai-engine/        # FastAPI microservice for AI-assisted BPMN generation/modification
+|   |-- app/
+|   |-- requirements.txt
+|   `-- .env
 |-- frontend/              # Angular standalone app + JointJS designer
 |   |-- src/
 |   |-- package.json
@@ -60,6 +64,33 @@ Nginx reverse proxy routes:
 - `/ws-designer` -> `backend:8080/ws-designer` (WebSocket Upgrade enabled)
 
 All services share network `bpmn-net`.
+
+## BPMN AI Microservice
+
+- Service: `bpmn-ai-engine` (FastAPI).
+- Main endpoints:
+  - `POST /api/v1/agent/diagram` with:
+    - `operation`: `create | modify`
+    - `instruction`
+    - `current_diagram` (required for `modify`)
+    - `lanes`, `context`
+  - `POST /api/ai/copilot-chat` with:
+    - `userMessage`
+    - `currentDiagram` (snapshot de `graph.toJSON()` de JointJS)
+- Health endpoint:
+  - `GET /health`
+- Output:
+  - for `/api/v1/agent/diagram`: updated `diagram` (`cells`) + `summary`, `changes`, `warnings`.
+  - for `/api/ai/copilot-chat`: `message` + `suggested_actions`.
+- Fallback behavior:
+  - if OpenAI credentials are not configured, service returns sanitized/default diagram payload.
+
+### Gateway Integration
+
+- Frontend Angular consume:
+  - `POST /api/copilot/chat` (Spring Boot)
+- Spring Boot reenvía a:
+  - `POST http://localhost:8010/api/ai/copilot-chat`
 
 ## Notes for ECS/Fargate
 

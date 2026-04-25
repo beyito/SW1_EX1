@@ -1,0 +1,39 @@
+<aside class="copilot-shell">
+  <header class="copilot-header">
+    <h3>BPMN Copilot</h3>
+    <button type="button" class="analyze-btn" (click)="requestAnalyze()" [disabled]="loading">
+      Analizar mi diagrama actual
+    </button>
+  </header>
+
+  <section class="messages">
+    @if (messages.length === 0) {
+      <p class="empty-hint">Escribe una pregunta o analiza el diagrama para comenzar.</p>
+    } @else {
+      @for (msg of messages; track msg.timestamp + msg.role) {
+        <div class="bubble" [class.user]="msg.role === 'user'" [class.assistant]="msg.role !== 'user'">
+          <p>{{ msg.text }}</p>
+          @if (msg.suggestedActions && msg.suggestedActions.length > 0) {
+            <ul>
+              @for (action of msg.suggestedActions; track action) {
+                <li>{{ action }}</li>
+              }
+            </ul>
+          }
+          <small>{{ msg.timestamp }}</small>
+        </div>
+      }
+    }
+  </section>
+
+  <footer class="composer">
+    <textarea
+      [(ngModel)]="inputText"
+      rows="3"
+      placeholder="Pregúntale al copilot sobre tu flujo BPMN..."
+      [disabled]="loading"></textarea>
+    <button type="button" (click)="submitMessage()" [disabled]="loading || !inputText.trim()">
+      {{ loading ? 'Enviando...' : 'Enviar' }}
+    </button>
+  </footer>
+</aside>

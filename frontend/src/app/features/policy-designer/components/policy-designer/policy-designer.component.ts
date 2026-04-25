@@ -14,12 +14,14 @@ import { NODE_TEMPLATES } from '../../utils/policy-designer.constants';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { CompanyAreaService } from '../../services/company-area.service';
 import { FileService } from '../../services/file.service';
+import { CopilotService } from '../../services/copilot.service';
 import { LinkPropertiesPanelComponent } from '../link-properties-panel/link-properties-panel.component';
+import { CopilotChatComponent, CopilotChatMessage } from '../copilot-chat/copilot-chat.component';
 
 @Component({
   selector: 'app-policy-designer',
   standalone: true,
-  imports: [CommonModule, FormsModule, NgFor, NgIf, RouterModule, LinkPropertiesPanelComponent],
+  imports: [CommonModule, FormsModule, NgFor, NgIf, RouterModule, LinkPropertiesPanelComponent, CopilotChatComponent],
   templateUrl: './policy-designer.component.html',
   styleUrl: './policy-designer.component.scss'
 })
@@ -33,6 +35,7 @@ export class PolicyDesignerComponent implements OnInit, AfterViewInit, OnDestroy
   private readonly companyAreaService = inject(CompanyAreaService);
   private readonly webSocketService = inject(WebSocketService);
   private readonly fileService = inject(FileService);
+  private readonly copilotService = inject(CopilotService);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -85,6 +88,8 @@ export class PolicyDesignerComponent implements OnInit, AfterViewInit, OnDestroy
   public isRenaming = false;
   public taskExecutionOrder: TaskExecutionOrder | null = null;
   public showTaskOrder = false;
+  public copilotLoading = false;
+  public copilotMessages: CopilotChatMessage[] = [];
 
   public ngOnInit(): void {
     this.registerPaperEvents();
@@ -1240,6 +1245,14 @@ private showLinkTools(linkView: dia.LinkView): void {
     return field.id;
   }
 
+  public async onCopilotMessageSubmitted(userText: string): Promise<void> {
+    await this.sendToCopilot(userText);
+  }
+
+  public async onCopilotAnalyzeRequested(): Promise<void> {
+    await this.sendToCopilot('Analiza mi diagrama actual y dame recomendaciones BPMN.');
+  }
+
   public trackByTaskId(index: number, task: any): string {
     return task.nodeId;
   }
@@ -1251,5 +1264,89 @@ private showLinkTools(linkView: dia.LinkView): void {
       const task = this.taskExecutionOrder!.tasks.find(t => t.nodeId === id);
       return task ? task.nodeLabel : id;
     }).join(', ');
+  }
+
+  private async sendToCopilot(userText: string): Promise<void> {
+    const text = (userText ?? '').trim();
+    if (!text) {
+      return;
+    }
+    this.copilotMessages = [
+      ...this.copilotMessages,
+      {
+        role: 'user',
+        text,
+        timestamp: new Date().toLocaleTimeString()
+      }
+    ];
+    this.copilotLoading = true;
+    this.cdr.detectChanges();
+
+    try {
+      const currentDiagram = this.graph.toJSON();
+      const response = await this.copilotService.sendMessage(text, currentDiagram);
+      this.copilotMessages = [
+        ...this.copilotMessages,
+        {
+          role: 'assistant',
+          text: response.message || 'Sin respuesta del copilot.',
+          timestamp: new Date().toLocaleTimeString(),
+          suggestedActions: response.suggestedActions ?? []
+        }
+      ];
+      if (this.isMutationIntent(text)) {
+        const apply = await this.copilotService.applyChange(
+          text,
+          currentDiagram,
+          this.lanes as unknown[],
+          {
+            policyId: this.selectedPolicyId ?? '',
+            policyName: this.policyName ?? ''
+          }
+        );
+
+        const updatedPolicy: PolicyPayload = {
+          id: this.selectedPolicyId ?? '',
+          name: this.policyName || 'Politica',
+          description: '',
+          diagramJson: JSON.stringify(apply.diagram),
+          lanes: this.lanes
+        };
+        this.applyPolicy(updatedPolicy);
+
+        const warnings = apply.warnings?.length ? ` | Advertencias: ${apply.warnings.join(' | ')}` : '';
+        this.copilotMessages = [
+          ...this.copilotMessages,
+          {
+            role: 'assistant',
+            text: `Cambio aplicado: ${apply.summary}${warnings}`,
+            timestamp: new Date().toLocaleTimeString(),
+            suggestedActions: apply.changes ?? []
+          }
+        ];
+        this.infoMessage = 'Copilot aplico cambios al diagrama.';
+      } else {
+        this.infoMessage = 'Copilot respondio con recomendaciones para tu diagrama.';
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.copilotMessages = [
+        ...this.copilotMessages,
+        {
+          role: 'system',
+          text: `No se pudo procesar la consulta: ${errorMessage}`,
+          timestamp: new Date().toLocaleTimeString()
+        }
+      ];
+      this.infoMessage = `Error usando BPMN Copilot: ${errorMessage}`;
+    } finally {
+      this.copilotLoading = false;
+      this.cdr.detectChanges();
+    }
+  }
+
+  private isMutationIntent(text: string): boolean {
+    const normalized = text.toLowerCase();
+    return /(agrega|añade|anade|crea|modifica|cambia|elimina|borra|conecta|desconecta|mueve|renombra|actualiza)/.test(normalized);
   }
 }

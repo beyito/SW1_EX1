@@ -315,5 +315,6 @@ Infra:
 - Web admin: gestion de empresas, admins, areas, funcionarios y clientes.
 - Disenador BPMN: colaborativo por WebSockets + persistencia.
 - Cliente mobile: login, lista de politicas iniciables, inicio de tramite, bandeja pendiente, detalle de tarea, completar tarea y adjuntos S3.
+- Nuevo microservicio IA BPMN (`bpmn-ai-engine`): asistente para crear/modificar diagramas (`POST /api/v1/agent/diagram`) y copilot contextual por chat (`POST /api/ai/copilot-chat`), consumido desde Spring en `POST /api/copilot/chat`.
 
 Este documento debe actualizarse cada vez que cambien contratos API, reglas de lane/rol o estructura de features.

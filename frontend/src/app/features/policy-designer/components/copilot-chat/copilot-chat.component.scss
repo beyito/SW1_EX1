@@ -1,0 +1,106 @@
+:host {
+  display: block;
+  height: 100%;
+}
+
+.copilot-shell {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 10px;
+  padding: 12px;
+  background: #f8fafc;
+  border-left: 1px solid #dbe3ef;
+}
+
+.copilot-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  h3 {
+    margin: 0;
+    color: #0f172a;
+  }
+}
+
+.analyze-btn {
+  border: 1px solid #2563eb;
+  background: #2563eb;
+  color: #fff;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.messages {
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 4px;
+}
+
+.empty-hint {
+  color: #64748b;
+  margin: 0;
+}
+
+.bubble {
+  padding: 10px;
+  border-radius: 10px;
+  max-width: 95%;
+  border: 1px solid #dbe3ef;
+
+  p {
+    margin: 0 0 6px;
+    white-space: pre-wrap;
+  }
+
+  ul {
+    margin: 0 0 6px 16px;
+    padding: 0;
+  }
+
+  small {
+    color: #64748b;
+    font-size: 0.72rem;
+  }
+}
+
+.bubble.user {
+  align-self: flex-end;
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
+.bubble.assistant {
+  align-self: flex-start;
+  background: #fff;
+}
+
+.composer {
+  display: grid;
+  gap: 8px;
+
+  textarea {
+    width: 100%;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 8px 10px;
+    resize: vertical;
+    font: inherit;
+    box-sizing: border-box;
+  }
+
+  button {
+    border: 1px solid #0f766e;
+    background: #0f766e;
+    color: #fff;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+}
