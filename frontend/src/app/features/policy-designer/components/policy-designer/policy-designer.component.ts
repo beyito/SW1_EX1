@@ -8,17 +8,18 @@ import { DiagramCanvasService } from '../../services/diagram-canvas.service';
 import { DiagramStorageService } from '../../services/diagram-storage.service';
 import { PolicyDataService } from '../../services/policy-data.service';
 import { WebSocketService } from '../../services/web-socket.service';
-import { Attachment, CompanyArea, Lane, PolicyPayload, FormField, TaskExecutionOrder } from '../../models/policy-designer.models';
+import { Attachment, CompanyArea, Lane, PolicyPayload, FormField, TaskExecutionOrder, LinkCondition, LinkConditionUpdate } from '../../models/policy-designer.models';
 import { DiagramEvent } from '../../models/diagram-event.model';
 import { NODE_TEMPLATES } from '../../utils/policy-designer.constants';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { CompanyAreaService } from '../../services/company-area.service';
 import { FileService } from '../../services/file.service';
+import { LinkPropertiesPanelComponent } from '../link-properties-panel/link-properties-panel.component';
 
 @Component({
   selector: 'app-policy-designer',
   standalone: true,
-  imports: [CommonModule, FormsModule, NgFor, NgIf, RouterModule],
+  imports: [CommonModule, FormsModule, NgFor, NgIf, RouterModule, LinkPropertiesPanelComponent],
   templateUrl: './policy-designer.component.html',
   styleUrl: './policy-designer.component.scss'
 })
@@ -71,7 +72,9 @@ export class PolicyDesignerComponent implements OnInit, AfterViewInit, OnDestroy
   public selectedTaskFormFields: FormField[] = [];
   public selectedTaskAttachments: Attachment[] = [];
   public selectedDecisionExpression = '';
-  public selectedLinkCondition = '';
+  public selectedLinkCondition: LinkCondition | null = null;
+  public selectedLinkConditionLabel = '';
+  public selectedLinkIsDecisionSource = false;
   public newFieldLabel = '';
   public newFieldType: FormField['type'] = 'text';
   public newFieldOptions = '';
@@ -283,6 +286,9 @@ private showLinkTools(linkView: dia.LinkView): void {
       this.selectedElementId = null;
       this.selectedElementType = null;
       this.selectedNodeType = null;
+      this.selectedLinkCondition = null;
+      this.selectedLinkConditionLabel = '';
+      this.selectedLinkIsDecisionSource = false;
       this.isRenaming = false;
       this.clearSelection();
       this.refreshView();
@@ -652,11 +658,17 @@ private showLinkTools(linkView: dia.LinkView): void {
     if (element && type === 'node') {
       this.newElementName = (element as any).attr('label/text') || '';
       this.selectedNodeType = element.get('nodeType') ?? null;
+      this.selectedLinkCondition = null;
+      this.selectedLinkConditionLabel = '';
+      this.selectedLinkIsDecisionSource = false;
       this.loadSelectedNodeMetadata(element as dia.Element);
       this.infoMessage = `Nodo seleccionado: "${this.newElementName}"`;
     } else if (element && element.isLink()) {
       this.selectedNodeType = null;
-      this.selectedLinkCondition = element.get('conditionLabel') ?? '';
+      const link = element as dia.Link;
+      this.selectedLinkIsDecisionSource = this.isDecisionSourceLink(link);
+      this.selectedLinkCondition = this.readLinkCondition(link);
+      this.selectedLinkConditionLabel = (link.get('conditionLabel') ?? '').toString();
       this.infoMessage = 'Flecha seleccionada.';
     }
     this.refreshView();
@@ -857,8 +869,8 @@ private showLinkTools(linkView: dia.LinkView): void {
     this.applySelectedNodeMetadata();
   }
 
-  public applySelectedLinkCondition(): void {
-    if (!this.selectedElementId || this.selectedElementType !== 'link') {
+  public onSelectedLinkConditionChange(update: LinkConditionUpdate): void {
+    if (!this.selectedElementId || this.selectedElementType !== 'link' || !this.selectedLinkIsDecisionSource) {
       return;
     }
 
@@ -867,9 +879,36 @@ private showLinkTools(linkView: dia.LinkView): void {
       return;
     }
 
-    this.diagramCanvasService.updateLinkCondition(link, this.selectedLinkCondition);
+    this.selectedLinkCondition = update.condition;
+    this.selectedLinkConditionLabel = update.conditionLabel;
+    this.diagramCanvasService.updateLinkCondition(link, update.conditionLabel, update.condition);
     this.scheduleLocalSave();
     this.scheduleCellRealtimeSync(link);
+  }
+
+  private isDecisionSourceLink(link: dia.Link): boolean {
+    const sourceId = link.get('source')?.id;
+    if (!sourceId) {
+      return false;
+    }
+    const sourceNode = this.graph.getCell(sourceId) as dia.Element | null;
+    return !!sourceNode && sourceNode.get('nodeType') === 'DECISION';
+  }
+
+  private readLinkCondition(link: dia.Link): LinkCondition {
+    const rawCondition = link.prop('condition') as LinkCondition | undefined;
+    if (!rawCondition || rawCondition.type === 'default') {
+      return { type: 'default' };
+    }
+
+    if (rawCondition.type === 'expression') {
+      return {
+        type: 'expression',
+        script: rawCondition.script ?? ''
+      };
+    }
+
+    return { type: 'default' };
   }
 
   private async loadPolicyFromRoute(policyId: string | null): Promise<void> {
@@ -1045,6 +1084,7 @@ private showLinkTools(linkView: dia.LinkView): void {
 
       if ('attrs' in snapshot) partialUpdate['attrs'] = snapshot['attrs'];
       if ('nodeMeta' in snapshot) partialUpdate['nodeMeta'] = snapshot['nodeMeta'];
+      if ('condition' in snapshot) partialUpdate['condition'] = snapshot['condition'];
       if ('conditionLabel' in snapshot) partialUpdate['conditionLabel'] = snapshot['conditionLabel'];
       if ('labels' in snapshot) partialUpdate['labels'] = snapshot['labels'];
       if ('vertices' in snapshot) partialUpdate['vertices'] = snapshot['vertices'];
@@ -1213,9 +1253,3 @@ private showLinkTools(linkView: dia.LinkView): void {
     }).join(', ');
   }
 }
-
-
-
-
-
-

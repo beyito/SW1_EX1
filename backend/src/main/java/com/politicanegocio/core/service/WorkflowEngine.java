@@ -4,8 +4,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.politicanegocio.core.model.Policy;
 import com.politicanegocio.core.repository.PolicyRepository;
-import com.politicanegocio.core.service.WorkflowEngine.WorkflowNode;
 
+import org.springframework.expression.ExpressionParser;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -14,12 +16,17 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Service
 public class WorkflowEngine {
+    private static final String NODE_TYPE_DECISION = "DECISION";
+    private static final String CONDITION_TYPE_DEFAULT = "default";
+    private static final String CONDITION_TYPE_EXPRESSION = "expression";
 
     private final PolicyRepository policyRepository;
     private final ObjectMapper objectMapper;
+    private final ExpressionParser expressionParser = new SpelExpressionParser();
 
     public WorkflowEngine(PolicyRepository policyRepository, ObjectMapper objectMapper) {
         this.policyRepository = policyRepository;
@@ -27,13 +34,17 @@ public class WorkflowEngine {
     }
     
     public List<WorkflowNode> getNextNodes(String policyId, String currentNodeId) {
+        return getNextNodes(policyId, currentNodeId, Map.of());
+    }
+
+    public List<WorkflowNode> getNextNodes(String policyId, String currentNodeId, Map<String, Object> routingVariables) {
         Policy policy = policyRepository.findById(policyId)
                 .orElseThrow(() -> new RuntimeException("Politica no encontrada con ID: " + policyId));
 
         try {
             JsonNode root = objectMapper.readTree(policy.getDiagramJson());
             Map<String, JsonNode> nodesById = new LinkedHashMap<>();
-            Map<String, List<String>> outgoingByNode = new HashMap<>();
+            Map<String, List<LinkDefinition>> outgoingByNode = new HashMap<>();
 
             if (root.has("cells")) {
                 for (JsonNode cell : root.get("cells")) {
@@ -43,7 +54,12 @@ public class WorkflowEngine {
                         String sourceId = cell.path("source").path("id").asText();
                         String targetId = cell.path("target").path("id").asText();
                         if (!sourceId.isBlank() && !targetId.isBlank()) {
-                            outgoingByNode.computeIfAbsent(sourceId, ignored -> new ArrayList<>()).add(targetId);
+                            outgoingByNode.computeIfAbsent(sourceId, ignored -> new ArrayList<>())
+                                    .add(new LinkDefinition(
+                                            targetId,
+                                            cell.path("condition").path("type").asText(""),
+                                            cell.path("condition").path("script").asText("")
+                                    ));
                         }
                     }
                 }
@@ -54,7 +70,18 @@ public class WorkflowEngine {
                 effectiveCurrentNodeId = findStartNodeId(nodesById);
             }
 
-            List<String> nextNodeIds = outgoingByNode.getOrDefault(effectiveCurrentNodeId, Collections.emptyList());
+            String currentNodeType = nodesById.getOrDefault(effectiveCurrentNodeId, objectMapper.createObjectNode())
+                    .path("nodeType")
+                    .asText("");
+
+            List<LinkDefinition> outgoingLinks = outgoingByNode.getOrDefault(effectiveCurrentNodeId, Collections.emptyList());
+            List<String> nextNodeIds;
+            if (NODE_TYPE_DECISION.equalsIgnoreCase(currentNodeType)) {
+                nextNodeIds = resolveDecisionTargets(outgoingLinks, routingVariables);
+            } else {
+                nextNodeIds = outgoingLinks.stream().map(LinkDefinition::targetId).toList();
+            }
+
             List<WorkflowNode> result = new ArrayList<>();
             for (String nextNodeId : nextNodeIds) {
                 JsonNode node = nodesById.get(nextNodeId);
@@ -71,6 +98,46 @@ public class WorkflowEngine {
             return result;
         } catch (Exception exception) {
             throw new RuntimeException("No se pudo resolver el flujo de trabajo: " + exception.getMessage());
+        }
+    }
+
+    private List<String> resolveDecisionTargets(List<LinkDefinition> outgoingLinks, Map<String, Object> routingVariables) {
+        if (outgoingLinks == null || outgoingLinks.isEmpty()) {
+            return List.of();
+        }
+
+        StandardEvaluationContext context = new StandardEvaluationContext();
+        if (routingVariables != null) {
+            routingVariables.forEach(context::setVariable);
+        }
+
+        List<String> matchedExpressionTargets = outgoingLinks.stream()
+                .filter(link -> CONDITION_TYPE_EXPRESSION.equalsIgnoreCase(link.conditionType()))
+                .filter(link -> evaluateExpression(link.script(), context))
+                .map(LinkDefinition::targetId)
+                .filter(Objects::nonNull)
+                .toList();
+        if (!matchedExpressionTargets.isEmpty()) {
+            return matchedExpressionTargets;
+        }
+
+        return outgoingLinks.stream()
+                .filter(link -> CONDITION_TYPE_DEFAULT.equalsIgnoreCase(link.conditionType()))
+                .map(LinkDefinition::targetId)
+                .findFirst()
+                .map(List::of)
+                .orElse(List.of());
+    }
+
+    private boolean evaluateExpression(String script, StandardEvaluationContext context) {
+        if (script == null || script.isBlank()) {
+            return false;
+        }
+        try {
+            Boolean result = expressionParser.parseExpression(script).getValue(context, Boolean.class);
+            return Boolean.TRUE.equals(result);
+        } catch (Exception ignored) {
+            return false;
         }
     }
 
@@ -182,5 +249,8 @@ public class WorkflowEngine {
         }
     }
     public record WorkflowNode(String nodeId, String nodeType, String nodeLabel, String laneId) {
+    }
+
+    private record LinkDefinition(String targetId, String conditionType, String script) {
     }
 }

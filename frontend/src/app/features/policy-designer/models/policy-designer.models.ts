@@ -76,3 +76,15 @@ export interface DesignerNodeTemplate {
   label: string;
 }
 
+export type LinkConditionType = 'default' | 'expression';
+
+export interface LinkCondition {
+  type: LinkConditionType;
+  script?: string;
+}
+
+export interface LinkConditionUpdate {
+  conditionLabel: string;
+  condition: LinkCondition;
+}
+

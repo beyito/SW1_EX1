@@ -30,6 +30,7 @@ export class TaskExecutionComponent implements OnInit {
   public formGroup: DynamicFormGroup = this.fb.group({}) as DynamicFormGroup;
   public formReady = false;
   public savedAnswers: Record<string, unknown> = {};
+  public decisionOptions: string[] = [];
 
   // 🚩 AGREGADO PARA S3: Control de estado de subida por cada campo
   public uploadingFiles: Record<string, boolean> = {};
@@ -65,6 +66,7 @@ export class TaskExecutionComponent implements OnInit {
       this.formGroup = this.buildForm(this.formSchemaFields);
       this.formReady = true;
       this.savedAnswers = this.parseFormData(detail.formData);
+      this.decisionOptions = this.getDecisionOptions();
     } catch (error) {
       this.message = error instanceof Error ? error.message : 'No se pudo cargar el detalle de la tarea';
     } finally {
@@ -117,7 +119,7 @@ export class TaskExecutionComponent implements OnInit {
     }
   }
 
-  public async submitTask(): Promise<void> {
+  public async submitTask(selectedDecision?: string): Promise<void> {
     if (this.formGroup.invalid) {
       this.formGroup.markAllAsTouched(); 
       this.message = 'Existen campos obligatorios sin completar.';
@@ -130,7 +132,13 @@ export class TaskExecutionComponent implements OnInit {
     this.cdr.detectChanges();
 
     try {
-      const payload = JSON.stringify(this.formGroup.getRawValue());
+      const formValues = this.formGroup.getRawValue() as Record<string, unknown>;
+      const payload: Record<string, unknown> = {
+        ...formValues
+      };
+      if (selectedDecision && selectedDecision.trim()) {
+        payload['_decisionTomada'] = selectedDecision.trim();
+      }
       await this.executionService.completeTask(this.taskDetail!.id, payload);
       await this.router.navigate(['/funcionario-dashboard']);
     } catch (error) {
@@ -139,11 +147,6 @@ export class TaskExecutionComponent implements OnInit {
       this.completingTask = false;
       this.cdr.detectChanges();
     }
-  }
-
-  public saveProgress(): void {
-    this.message = 'Progreso guardado localmente (no persistente).';
-    this.cdr.detectChanges(); 
   }
 
   public statusLabel(status: string): string { 
@@ -214,6 +217,66 @@ export class TaskExecutionComponent implements OnInit {
     } catch (error) {
       console.error('Error al parsear formData:', error);
       return {};
+    }
+  }
+
+  public getDecisionOptions(): string[] {
+    const diagramJson = this.taskDetail?.diagramJson;
+    const currentNodeId = this.taskDetail?.taskId;
+    if (!diagramJson || !currentNodeId) {
+      return [];
+    }
+
+    const cells = this.parseDiagramCells(diagramJson);
+    if (!cells.length) {
+      return [];
+    }
+
+    const linkFromCurrent = cells.find((cell) => {
+      if (cell.type !== 'standard.Link') {
+        return false;
+      }
+      return cell.source?.id === currentNodeId;
+    });
+    if (!linkFromCurrent?.target?.id) {
+      return [];
+    }
+
+    const nextNode = cells.find((cell) => cell.id === linkFromCurrent.target?.id);
+    if (!nextNode || nextNode.nodeType !== 'DECISION') {
+      return [];
+    }
+
+    return cells
+      .filter((cell) => cell.type === 'standard.Link' && cell.source?.id === nextNode.id)
+      .map((cell) => (cell.conditionLabel ?? '').toString().trim())
+      .filter((label) => !!label);
+  }
+
+  private parseDiagramCells(rawDiagramJson: string): Array<{
+    id?: string;
+    type?: string;
+    nodeType?: string;
+    source?: { id?: string };
+    target?: { id?: string };
+    conditionLabel?: string;
+  }> {
+    try {
+      const parsed = JSON.parse(rawDiagramJson) as { cells?: unknown };
+      if (!parsed || !Array.isArray(parsed.cells)) {
+        return [];
+      }
+      return parsed.cells as Array<{
+        id?: string;
+        type?: string;
+        nodeType?: string;
+        source?: { id?: string };
+        target?: { id?: string };
+        conditionLabel?: string;
+      }>;
+    } catch (error) {
+      console.error('Error al parsear diagramJson para lookahead:', error);
+      return [];
     }
   }
 }

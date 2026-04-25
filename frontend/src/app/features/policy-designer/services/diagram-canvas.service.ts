@@ -1,6 +1,6 @@
 import { ElementRef, Injectable } from '@angular/core';
 import { dia, shapes } from '@joint/plus';
-import { Lane, PolicyPayload } from '../models/policy-designer.models';
+import { Lane, LinkCondition, PolicyPayload } from '../models/policy-designer.models';
 
 @Injectable({ providedIn: 'root' })
 export class DiagramCanvasService {
@@ -305,6 +305,10 @@ export class DiagramCanvasService {
 
     if (condition) {
       link.set('conditionLabel', condition);
+      link.prop('condition', {
+        type: 'expression',
+        script: `#_decisionTomada == '${this.escapeSingleQuotes(condition)}'`
+      });
       link.appendLabel({
         attrs: {
           text: {
@@ -495,7 +499,7 @@ public renderLaneBackgrounds(graph: dia.Graph, lanes: Lane[]): void {
     }
   }
 
-  public updateLinkCondition(link: dia.Link, condition: string): void {
+  public updateLinkCondition(link: dia.Link, conditionLabel: string, condition?: LinkCondition): void {
     if (!link || !link.isLink()) {
       return;
     }
@@ -504,13 +508,24 @@ public renderLaneBackgrounds(graph: dia.Graph, lanes: Lane[]): void {
       link.removeLabel(0);
     }
 
-    link.set('conditionLabel', condition);
-
+    const cleanLabel = (conditionLabel ?? '').trim();
+    link.set('conditionLabel', cleanLabel);
     if (condition) {
+      link.prop('condition', condition);
+    } else if (cleanLabel) {
+      link.prop('condition', {
+        type: 'expression',
+        script: `#_decisionTomada == '${this.escapeSingleQuotes(cleanLabel)}'`
+      });
+    } else {
+      link.prop('condition', { type: 'default' });
+    }
+
+    if (cleanLabel) {
       link.appendLabel({
         attrs: {
           text: {
-            text: condition,
+            text: cleanLabel,
             fill: '#0f172a',
             fontSize: 13,
             fontWeight: 'bold'
@@ -526,6 +541,10 @@ public renderLaneBackgrounds(graph: dia.Graph, lanes: Lane[]): void {
         position: 0.5
       });
     }
+  }
+
+  private escapeSingleQuotes(value: string): string {
+    return value.replace(/'/g, "\\'");
   }
 
   private getLaneWidth(laneCount: number): number {

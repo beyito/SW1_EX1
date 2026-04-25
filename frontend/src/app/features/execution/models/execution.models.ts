@@ -43,7 +43,6 @@ export interface StartablePolicyDto {
 export interface TaskFormField {
   id?: string;
   name?: string;
-  // 🚩 AÑADIDO: 'file' al final de los tipos permitidos
   type: 'text' | 'number' | 'select' | 'checkbox' | 'boolean' | 'date' | 'textarea' | 'file';
   label: string;
   required?: boolean;
@@ -52,14 +51,14 @@ export interface TaskFormField {
 }
 
 export interface TaskDetailDto {
-  id: string; // Puede ser el processInstanceId o un ID interno
-  // 🚩 AÑADIDO: policyId y taskInstanceId para que el componente funcione
-  policyId?: string; 
-  taskInstanceId: string; 
+  id: string;
+  policyId?: string;
+  taskId?: string;
   taskName: string;
   processName: string;
   status: TaskStatus;
   description: string;
   formSchema: string;
   formData?: string | null;
+  diagramJson?: string;
 }

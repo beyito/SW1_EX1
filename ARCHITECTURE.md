@@ -4,7 +4,7 @@
 
 ```text
 /
-|-- backend/               # Spring Boot API + GraphQL + WebSocket + Redis + S3
+|-- backend/               # Spring Boot API + GraphQL + WebSocket (STOMP/RabbitMQ) + S3
 |   |-- src/
 |   |-- pom.xml
 |   `-- Dockerfile
@@ -32,17 +32,26 @@
 ## Real-time Collaboration Across Containers
 
 - Client sends STOMP events to `/app/policy/{policyId}/change`.
-- Backend controller publishes event envelopes into Redis channel `designer-events`.
-- Every backend instance listens to Redis pub/sub.
-- Listener forwards events to WebSocket destination `/topic/policy/{policyId}`.
+- Backend `DesignerSocketController` forwards events to `/topic/policy.{policyId}`.
+- Spring WebSocket uses STOMP broker relay backed by RabbitMQ.
 - Connected clients in all containers receive updates consistently.
+
+## Lookahead Routing for Decisions
+
+1. While rendering a task form, frontend reads `diagramJson` and `taskId` (current node).
+2. Frontend performs lookahead:
+   - finds immediate next node from current task,
+   - if next node is `DECISION`, extracts outgoing link labels (`conditionLabel`).
+3. UI shows one completion button per decision option (`Completar: Sí`, `Completar: No`, etc.).
+4. On click, frontend injects `_decisionTomada: <opcion>` into submitted `formData`.
+5. Backend evaluates SpEL conditions on decision links (for example `#_decisionTomada == 'Sí'`) and advances only through the matching branch (or `default` fallback).
 
 ## Container Communication (Docker)
 
 - `frontend` (Nginx): exposes `:4200` -> serves Angular.
 - `backend` (Spring): exposes `:8080` -> REST/GraphQL/WebSocket.
-- `redis`: exposes `:6379` -> collaborative event bus.
-- `mongo`: exposes `:27017` -> current persistence.
+- `rabbitmq`: exposes `:5672` (`STOMP relay`) and `:15672` (`management UI`).
+- MongoDB is currently external via `MONGODB_URI` (Atlas/self-managed).
 
 Nginx reverse proxy routes:
 
@@ -56,5 +65,5 @@ All services share network `bpmn-net`.
 
 - Do not hardcode secrets; inject from Secrets Manager/SSM.
 - Keep S3 bucket private and use presigned URLs.
-- Run Redis as managed ElastiCache in production.
-- Replace local Mongo container with managed DocumentDB/MongoDB Atlas in production.
+- Run RabbitMQ as managed broker/cluster in production.
+- Use managed Mongo service (DocumentDB/MongoDB Atlas) for persistence.

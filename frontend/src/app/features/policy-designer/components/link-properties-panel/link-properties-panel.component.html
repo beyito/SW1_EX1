@@ -1,0 +1,26 @@
+<section class="link-properties" *ngIf="visible">
+  <p class="section-title">Propiedades de Ruta</p>
+
+  <p class="section-hint" *ngIf="!isDecisionSource">
+    Esta flecha no sale de un nodo de decisión.
+  </p>
+
+  <form [formGroup]="form" *ngIf="isDecisionSource">
+    <label>Tipo de ruta</label>
+    <select formControlName="routeType">
+      <option value="default">Ruta por Defecto (Default)</option>
+      <option value="expression">Condición Evaluable</option>
+    </select>
+
+    <label>Etiqueta de Ruta</label>
+    <input
+      type="text"
+      formControlName="conditionLabel"
+      placeholder="Ej: Sí, No, Rechazado"
+    />
+
+    <small class="spel-preview" *ngIf="form.controls.routeType.value === 'expression' && form.controls.conditionLabel.value">
+      Script generado: #_decisionTomada == '{{ form.controls.conditionLabel.value }}'
+    </small>
+  </form>
+</section>

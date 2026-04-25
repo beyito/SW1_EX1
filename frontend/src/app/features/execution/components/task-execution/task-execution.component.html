@@ -99,9 +99,17 @@
           }
 
           <div class="actions">
-            <button class="btn btn-success" type="submit" [disabled]="completingTask || formGroup.invalid">
-              {{ completingTask ? 'Completando...' : 'Completar Tarea' }}
-            </button>
+            @if (decisionOptions.length === 0) {
+              <button class="btn btn-success" type="submit" [disabled]="completingTask || formGroup.invalid">
+                {{ completingTask ? 'Completando...' : 'Completar Tarea' }}
+              </button>
+            } @else {
+              @for (option of decisionOptions; track option) {
+                <button class="btn btn-success" type="button" [disabled]="completingTask || formGroup.invalid" (click)="submitTask(option)">
+                  {{ completingTask ? 'Completando...' : 'Completar: ' + option }}
+                </button>
+              }
+            }
 
             @if (formGroup.invalid && formGroup.touched) {
               <p class="error-hint">⚠️ Debes completar todos los campos obligatorios antes de continuar.</p>

@@ -195,15 +195,25 @@
       </div>
 
       <!-- Para links, mostrar mensaje -->
-      <div *ngIf="selectedElementType === 'link'">
+      <div *ngIf="false">
         <p class="section-title">Etiqueta de flecha</p>
         <label>Condición / texto de ruta</label>
         <input
           type="text"
-          [(ngModel)]="selectedLinkCondition"
+          [(ngModel)]="selectedLinkConditionLabel"
           placeholder="Sí / No / Otro texto"
         />
-        <button type="button" class="wide-button" (click)="applySelectedLinkCondition()">Guardar etiqueta</button>
+        <button type="button" class="wide-button"></button>
+      </div>
+
+      <div *ngIf="selectedElementType === 'link'">
+        <app-link-properties-panel
+          [visible]="true"
+          [isDecisionSource]="selectedLinkIsDecisionSource"
+          [currentCondition]="selectedLinkCondition"
+          [currentConditionLabel]="selectedLinkConditionLabel"
+          (conditionChanged)="onSelectedLinkConditionChange($event)">
+        </app-link-properties-panel>
       </div>
 
       <!-- Eliminar elemento -->

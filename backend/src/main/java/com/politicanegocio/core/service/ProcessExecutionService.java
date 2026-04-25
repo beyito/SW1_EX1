@@ -74,10 +74,10 @@ public class ProcessExecutionService {
         processInstance.setStartedAt(LocalDateTime.now());
         ProcessInstance savedProcessInstance = processInstanceRepository.save(processInstance);
 
-        List<WorkflowEngine.WorkflowNode> nextNodes = workflowEngine.getNextNodes(policyId, "START");
+        List<WorkflowEngine.WorkflowNode> nextNodes = workflowEngine.getNextNodes(policyId, "START", Map.of());
         
         // 🚩 LLAMADA AL NUEVO MOTOR RECURSIVO
-        advanceWorkflow(savedProcessInstance, nextNodes);
+        advanceWorkflow(savedProcessInstance, nextNodes, Map.of());
         
         return savedProcessInstance;
     }
@@ -156,14 +156,16 @@ public class ProcessExecutionService {
 
         ProcessInstance processInstance = processInstanceRepository.findById(taskInstance.getProcessInstanceId())
                 .orElseThrow(() -> new RuntimeException("Instancia de proceso no encontrada"));
+        Map<String, Object> routingVariables = parseRoutingVariables(formData);
 
         List<WorkflowEngine.WorkflowNode> nextNodes = workflowEngine.getNextNodes(
                 processInstance.getPolicyId(),
-                completedTask.getTaskId()
+                completedTask.getTaskId(),
+                routingVariables
         );
 
         // 🚩 LLAMADA AL NUEVO MOTOR RECURSIVO PARA AVANZAR EL FLUJO
-        advanceWorkflow(processInstance, nextNodes);
+        advanceWorkflow(processInstance, nextNodes, routingVariables);
         
         return completedTask;
     }
@@ -343,12 +345,15 @@ public class ProcessExecutionService {
 
         return new TaskDetailDto(
                 taskInstance.getId(),
+                processInstance.getPolicyId(),
+                taskInstance.getTaskId(),
                 taskName,
                 processName,
                 taskInstance.getStatus(),
                 nodeDefinition.description(),
                 nodeDefinition.formSchema(),
-                taskInstance.getFormData()
+                taskInstance.getFormData(),
+                policy.getDiagramJson()
         );
     }
 
@@ -434,7 +439,11 @@ public class ProcessExecutionService {
     // =========================================================================
     // 🚩 EL NUEVO MOTOR DE ORQUESTACIÓN RECURSIVO
     // =========================================================================
-    private void advanceWorkflow(ProcessInstance processInstance, List<WorkflowEngine.WorkflowNode> nextNodes) {
+    private void advanceWorkflow(
+            ProcessInstance processInstance,
+            List<WorkflowEngine.WorkflowNode> nextNodes,
+            Map<String, Object> routingVariables
+    ) {
         if (nextNodes == null || nextNodes.isEmpty()) return;
 
         for (WorkflowEngine.WorkflowNode node : nextNodes) {
@@ -442,8 +451,20 @@ public class ProcessExecutionService {
 
             if ("FORK".equals(type)) {
                 // Salta automáticamente a los siguientes caminos
-                List<WorkflowEngine.WorkflowNode> nextFromFork = workflowEngine.getNextNodes(processInstance.getPolicyId(), node.nodeId());
-                advanceWorkflow(processInstance, nextFromFork); 
+                List<WorkflowEngine.WorkflowNode> nextFromFork = workflowEngine.getNextNodes(
+                        processInstance.getPolicyId(),
+                        node.nodeId(),
+                        routingVariables
+                );
+                advanceWorkflow(processInstance, nextFromFork, routingVariables); 
+            }
+            else if ("DECISION".equals(type)) {
+                List<WorkflowEngine.WorkflowNode> nextFromDecision = workflowEngine.getNextNodes(
+                        processInstance.getPolicyId(),
+                        node.nodeId(),
+                        routingVariables
+                );
+                advanceWorkflow(processInstance, nextFromDecision, routingVariables);
             } 
             else if ("JOIN".equals(type)) {
                 // Espera a que todas las ramas entrantes terminen
@@ -460,8 +481,12 @@ public class ProcessExecutionService {
                 }
 
                 if (allCompleted) {
-                    List<WorkflowEngine.WorkflowNode> nextFromJoin = workflowEngine.getNextNodes(processInstance.getPolicyId(), node.nodeId());
-                    advanceWorkflow(processInstance, nextFromJoin);
+                    List<WorkflowEngine.WorkflowNode> nextFromJoin = workflowEngine.getNextNodes(
+                            processInstance.getPolicyId(),
+                            node.nodeId(),
+                            routingVariables
+                    );
+                    advanceWorkflow(processInstance, nextFromJoin, routingVariables);
                 }
             } 
             else if ("END".equals(type)) {
@@ -474,6 +499,27 @@ public class ProcessExecutionService {
                 // Tarea normal o cualquier otra cosa, la creamos para que la tome un humano
                 createSinglePendingTask(processInstance.getId(), node);
             }
+        }
+    }
+
+    private Map<String, Object> parseRoutingVariables(String rawFormData) {
+        if (rawFormData == null || rawFormData.isBlank()) {
+            return Map.of();
+        }
+        try {
+            JsonNode node = objectMapper.readTree(rawFormData);
+            if (node.isTextual()) {
+                node = objectMapper.readTree(node.asText());
+            }
+            if (!node.isObject()) {
+                return Map.of();
+            }
+            return objectMapper.convertValue(
+                    node,
+                    objectMapper.getTypeFactory().constructMapType(Map.class, String.class, Object.class)
+            );
+        } catch (Exception exception) {
+            return Map.of();
         }
     }
 
