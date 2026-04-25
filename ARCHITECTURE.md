@@ -43,7 +43,6 @@
 - `backend` (Spring): exposes `:8080` -> REST/GraphQL/WebSocket.
 - `redis`: exposes `:6379` -> collaborative event bus.
 - `mongo`: exposes `:27017` -> current persistence.
-- `postgres`: exposes `:5432` -> RDS simulation placeholder.
 
 Nginx reverse proxy routes:
 
@@ -58,4 +57,4 @@ All services share network `bpmn-net`.
 - Do not hardcode secrets; inject from Secrets Manager/SSM.
 - Keep S3 bucket private and use presigned URLs.
 - Run Redis as managed ElastiCache in production.
-- Replace local Mongo/Postgres containers with managed services (DocumentDB/RDS).
+- Replace local Mongo container with managed DocumentDB/MongoDB Atlas in production.
