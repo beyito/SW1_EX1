@@ -1,6 +1,7 @@
 package com.politicanegocio.core.config;
 
 import com.politicanegocio.core.security.AuthTokenFilter;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy; // <-- IMPORTACIÓN NECESARIA
@@ -31,7 +32,7 @@ public class SecurityConfig {
     }
 
     @Value("${app.cors.allowed-origins}")
-    private String[] allowedOrigins;
+    private String allowedOrigins;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -40,7 +41,12 @@ public class SecurityConfig {
                 CorsConfiguration config = new CorsConfiguration();
                 
                 // 2. Usamos la variable inyectada aquí
-                config.setAllowedOriginPatterns(Arrays.asList(allowedOrigins));
+                config.setAllowedOriginPatterns(
+                    Arrays.stream(allowedOrigins.split(","))
+                        .map(String::trim)
+                        .filter(origin -> !origin.isBlank())
+                        .toList()
+                );
                 
                 config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
                 config.setAllowedHeaders(List.of("*"));
