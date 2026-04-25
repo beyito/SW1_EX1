@@ -12,6 +12,8 @@ public class ProcessInstance {
     @Id
     private String id;
     private String policyId;
+    private String title;
+    private String description;
     private ProcessInstanceStatus status;
     private String startedBy;
     private LocalDateTime startedAt;

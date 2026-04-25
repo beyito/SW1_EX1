@@ -69,7 +69,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
 
     try {
-      await widget.dashboardService.startProcess(policy.id);
+      final processMetadata = await _askForProcessMetadata(policy);
+      if (processMetadata == null) {
+        return;
+      }
+
+      await widget.dashboardService.startProcess(
+        policy.id,
+        title: processMetadata.title,
+        description: processMetadata.description,
+      );
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -95,6 +104,67 @@ class _DashboardScreenState extends State<DashboardScreen> {
         });
       }
     }
+  }
+
+  Future<_ProcessMetadata?> _askForProcessMetadata(StartablePolicy policy) async {
+    final titleController = TextEditingController(text: policy.name);
+    final descriptionController = TextEditingController();
+
+    final result = await showDialog<_ProcessMetadata>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Nueva instancia'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: titleController,
+                maxLength: 120,
+                decoration: const InputDecoration(
+                  labelText: 'Titulo',
+                  hintText: 'Ej. Solicitud de compra abril',
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: descriptionController,
+                maxLines: 3,
+                maxLength: 300,
+                decoration: const InputDecoration(
+                  labelText: 'Descripcion',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final title = titleController.text.trim();
+                if (title.isEmpty) {
+                  return;
+                }
+                Navigator.of(dialogContext).pop(
+                  _ProcessMetadata(
+                    title: title,
+                    description: descriptionController.text.trim(),
+                  ),
+                );
+              },
+              child: const Text('Iniciar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    titleController.dispose();
+    descriptionController.dispose();
+    return result;
   }
 
   @override
@@ -181,4 +251,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     );
   }
+}
+
+class _ProcessMetadata {
+  final String title;
+  final String description;
+
+  const _ProcessMetadata({
+    required this.title,
+    required this.description,
+  });
 }

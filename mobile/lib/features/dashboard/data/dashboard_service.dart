@@ -28,11 +28,15 @@ class DashboardService {
     }
   }
 
-  Future<void> startProcess(String policyId) async {
+  Future<void> startProcess(String policyId, {required String title, required String description}) async {
     try {
       await _apiClient.dio.post(
         '/api/execution/process/start',
-        data: {'policyId': policyId},
+        data: {
+          'policyId': policyId,
+          'title': title,
+          'description': description,
+        },
       );
     } on DioException catch (error) {
       final backendMessage = error.response?.data is Map

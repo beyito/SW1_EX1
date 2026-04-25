@@ -9,6 +9,9 @@ import java.util.List;
 public interface TaskInstanceRepository extends MongoRepository<TaskInstance, String> {
     List<TaskInstance> findByLaneId(String laneId);
     List<TaskInstance> findByLaneIdAndStatus(String laneId, TaskInstanceStatus status);
+    List<TaskInstance> findByProcessInstanceIdIn(List<String> processInstanceIds);
+    List<TaskInstance> findByProcessInstanceIdInAndLaneId(List<String> processInstanceIds, String laneId);
+    List<TaskInstance> findByProcessInstanceIdInAndAssignedTo(List<String> processInstanceIds, String assignedTo);
     List<TaskInstance> findByProcessInstanceIdInAndStatusAndLaneId(List<String> processInstanceIds, TaskInstanceStatus status, String laneId);
     List<TaskInstance> findByProcessInstanceIdInAndStatus(List<String> processInstanceIds, TaskInstanceStatus status);
     List<TaskInstance> findByAssignedTo(String assignedTo);

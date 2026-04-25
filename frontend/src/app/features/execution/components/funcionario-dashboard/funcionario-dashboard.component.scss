@@ -127,6 +127,39 @@ $border-color: #e2e8f0;
     flex-grow: 1; /* Esto empuja el botón siempre hacia abajo aunque el texto sea corto */
   }
 
+  .start-form {
+    display: grid;
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      color: $text-muted;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+
+    input,
+    textarea {
+      width: 100%;
+      border: 1px solid $border-color;
+      border-radius: 0.45rem;
+      padding: 0.5rem 0.6rem;
+      font: inherit;
+      color: $text-main;
+      background: #fff;
+      resize: vertical;
+
+      &:focus {
+        outline: none;
+        border-color: #818cf8;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
+      }
+    }
+  }
+
   /* Botón de Iniciar Proceso */
   button {
     background-color: $primary;
@@ -195,6 +228,77 @@ $border-color: #e2e8f0;
       border-left: 3px solid transparent;
       transition: border-color 0.15s ease;
     }
+  }
+}
+
+.process-task-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 300px) 1fr;
+  gap: 1rem;
+}
+
+.process-list {
+  h4 {
+    margin: 0 0 0.7rem 0;
+    color: $text-main;
+  }
+
+  ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  li {
+    border: 1px solid $border-color;
+    border-radius: 0.45rem;
+    padding: 0.65rem 0.7rem;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    background: #fff;
+
+    strong {
+      color: $text-main;
+      font-size: 0.92rem;
+    }
+
+    span,
+    small {
+      color: $text-muted;
+      font-size: 0.8rem;
+    }
+
+    &.selected {
+      border-color: #818cf8;
+      background: #eef2ff;
+    }
+  }
+}
+
+.process-tasks-header {
+  margin-bottom: 0.8rem;
+
+  h4 {
+    margin: 0;
+    font-size: 1rem;
+    color: $text-main;
+  }
+
+  p {
+    margin: 0.35rem 0 0 0;
+    color: $text-muted;
+    font-size: 0.88rem;
+  }
+}
+
+@media (max-width: 1024px) {
+  .process-task-layout {
+    grid-template-columns: 1fr;
   }
 }
 

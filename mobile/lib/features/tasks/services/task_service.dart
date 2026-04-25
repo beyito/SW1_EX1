@@ -5,6 +5,7 @@ import 'package:dio/dio.dart' as dio;
 
 import '../../../core/network/api_client.dart';
 import '../models/pending_task_model.dart';
+import '../models/process_task_group_model.dart';
 import '../models/task_detail_model.dart';
 
 class TaskService {
@@ -37,6 +38,32 @@ class TaskService {
         throw Exception(data.trim());
       }
       throw Exception('No se pudieron cargar tus tareas pendientes.');
+    }
+  }
+
+  Future<List<ProcessTaskGroupModel>> getMyProcessTaskGroups() async {
+    try {
+      final response = await _apiClient.dio.get('/api/execution/my-processes/tasks');
+      final payload = response.data;
+      if (payload is! List) {
+        return const [];
+      }
+      return payload
+          .whereType<Map<String, dynamic>>()
+          .map(ProcessTaskGroupModel.fromJson)
+          .toList(growable: false);
+    } on DioException catch (error) {
+      final data = error.response?.data;
+      if (data is Map<String, dynamic>) {
+        final message = data['message']?.toString().trim();
+        if (message != null && message.isNotEmpty) {
+          throw Exception(message);
+        }
+      }
+      if (data is String && data.trim().isNotEmpty) {
+        throw Exception(data.trim());
+      }
+      throw Exception('No se pudieron cargar tus instancias y tareas.');
     }
   }
 

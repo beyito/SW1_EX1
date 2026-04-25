@@ -20,6 +20,16 @@
           <article class="policy-card">
             <h4>{{ policy.name }}</h4>
             <p>{{ policy.description || 'Sin descripcion' }}</p>
+            <div class="start-form">
+              <label>
+                Titulo de instancia
+                <input type="text" [(ngModel)]="draftFor(policy).title" maxlength="120" />
+              </label>
+              <label>
+                Descripcion
+                <textarea rows="2" [(ngModel)]="draftFor(policy).description" maxlength="300"></textarea>
+              </label>
+            </div>
             <button
               type="button"
               [disabled]="startingPolicyId === policy.id"
@@ -39,32 +49,62 @@
   <section class="panel">
     <h3>Bandeja de Entrada</h3>
     @if (loading) {
-      <p class="hint">Cargando tareas...</p>
-    } @else if (pendingTasks.length === 0) {
-      <p class="hint">No tienes tareas pendientes.</p>
+      <p class="hint">Cargando procesos activos...</p>
+    } @else if (processGroups.length === 0) {
+      <p class="hint">No tienes procesos activos con tareas en tu area.</p>
     } @else {
-      <table class="tasks-table">
-        <thead>
-          <tr>
-            <th>Proceso</th>
-            <th>Tarea</th>
-            <th>Estado</th>
-            <th>Creada</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (task of pendingTasks; track task.taskInstanceId) {
-            <tr (click)="openTask(task)">
-              <td>{{ task.processName }}</td>
-              <td>{{ task.taskName }}</td>
-              <td>
-                <span [class]="statusClass(task.status)">{{ statusLabel(task.status) }}</span>
-              </td>
-              <td>{{ task.createdAt | date: 'short' }}</td>
-            </tr>
+      <div class="process-task-layout">
+        <aside class="process-list">
+          <h4>Procesos Activos</h4>
+          <ul>
+            @for (group of processGroups; track group.processInstanceId) {
+              <li
+                [class.selected]="group.processInstanceId === selectedProcessId"
+                (click)="selectProcess(group)">
+                <strong>{{ group.processTitle }}</strong>
+                <span>{{ group.startedAt | date: 'short' }}</span>
+                <small>{{ group.tasks.length }} tareas</small>
+              </li>
+            }
+          </ul>
+        </aside>
+
+        <section class="process-tasks">
+          @if (selectedProcess) {
+            <header class="process-tasks-header">
+              <h4>{{ selectedProcess.processTitle }}</h4>
+              @if (selectedProcess.processDescription) {
+                <p>{{ selectedProcess.processDescription }}</p>
+              }
+            </header>
+
+            @if (selectedProcess.tasks.length === 0) {
+              <p class="hint">Este proceso no tiene tareas visibles para tu area.</p>
+            } @else {
+              <table class="tasks-table">
+                <thead>
+                  <tr>
+                    <th>Tarea</th>
+                    <th>Estado</th>
+                    <th>Creada</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (task of selectedProcess.tasks; track task.taskInstanceId) {
+                    <tr (click)="openTask(task)">
+                      <td>{{ task.taskName }}</td>
+                      <td>
+                        <span [class]="statusClass(task.status)">{{ statusLabel(task.status) }}</span>
+                      </td>
+                      <td>{{ task.createdAt | date: 'short' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            }
           }
-        </tbody>
-      </table>
+        </section>
+      </div>
     }
   </section>
 </div>

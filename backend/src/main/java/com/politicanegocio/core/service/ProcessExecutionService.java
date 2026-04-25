@@ -3,6 +3,8 @@ package com.politicanegocio.core.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.politicanegocio.core.dto.PendingTaskDto;
+import com.politicanegocio.core.dto.ProcessTaskDto;
+import com.politicanegocio.core.dto.ProcessTaskGroupDto;
 import com.politicanegocio.core.dto.TaskDetailDto;
 import com.politicanegocio.core.model.Policy;
 import com.politicanegocio.core.model.ProcessInstance;
@@ -19,6 +21,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -57,7 +60,7 @@ public class ProcessExecutionService {
         this.objectMapper = objectMapper;
     }
 
-    public ProcessInstance startProcess(String policyId, User user) {
+    public ProcessInstance startProcess(String policyId, String title, String description, User user) {
         Policy policy = policyRepository.findById(policyId)
                 .orElseThrow(() -> new RuntimeException("Politica no encontrada con ID: " + policyId));
 
@@ -69,6 +72,8 @@ public class ProcessExecutionService {
         ProcessInstance processInstance = new ProcessInstance();
         processInstance.setId(UUID.randomUUID().toString());
         processInstance.setPolicyId(policyId);
+        processInstance.setTitle(resolveProcessTitle(title, policy));
+        processInstance.setDescription(resolveProcessDescription(description));
         processInstance.setStatus(ProcessInstanceStatus.ACTIVE);
         processInstance.setStartedBy(user.getUsername());
         processInstance.setStartedAt(LocalDateTime.now());
@@ -216,11 +221,14 @@ public class ProcessExecutionService {
                     String taskName = policyId.isBlank()
                             ? task.getTaskId()
                             : workflowEngine.getNodeName(policyId, task.getTaskId());
+                    String processName = process != null && process.getTitle() != null && !process.getTitle().isBlank()
+                            ? process.getTitle().trim()
+                            : (policy != null ? policy.getName() : "Proceso");
                     return new PendingTaskDto(
                             task.getId(),
                             task.getProcessInstanceId(),
                             policyId,
-                            policy != null ? policy.getName() : "Proceso",
+                            processName,
                             task.getTaskId(),
                             taskName,
                             task.getLaneId(),
@@ -265,6 +273,83 @@ public class ProcessExecutionService {
             return List.of();
         }
         return mapToPendingTaskDtos(tasks);
+    }
+
+    public List<ProcessTaskGroupDto> getMyProcessTaskGroups(User user) {
+        if (isClientUser(user)) {
+            return getClientProcessTaskGroups(user);
+        }
+
+        String laneId = resolveUserLaneId(user);
+        if (laneId.isBlank()) {
+            return List.of();
+        }
+
+        List<ProcessInstance> activeProcesses = processInstanceRepository.findByStatusOrderByStartedAtDesc(ProcessInstanceStatus.ACTIVE);
+        if (activeProcesses.isEmpty()) {
+            return List.of();
+        }
+
+        List<String> processIds = activeProcesses.stream()
+                .map(ProcessInstance::getId)
+                .filter(id -> id != null && !id.isBlank())
+                .toList();
+        if (processIds.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, TaskInstance> deduplicated = new LinkedHashMap<>();
+        for (TaskInstance task : taskInstanceRepository.findByProcessInstanceIdInAndLaneId(processIds, laneId)) {
+            deduplicated.put(task.getId(), task);
+        }
+        if (user != null && user.getUsername() != null && !user.getUsername().isBlank()) {
+            for (TaskInstance task : taskInstanceRepository.findByProcessInstanceIdInAndAssignedTo(processIds, user.getUsername())) {
+                deduplicated.put(task.getId(), task);
+            }
+        }
+
+        if (deduplicated.isEmpty()) {
+            return List.of();
+        }
+
+        return mapToProcessTaskGroups(activeProcesses, new ArrayList<>(deduplicated.values()), false);
+    }
+
+    private List<ProcessTaskGroupDto> getClientProcessTaskGroups(User user) {
+        if (user == null || user.getUsername() == null || user.getUsername().isBlank()) {
+            return List.of();
+        }
+
+        List<ProcessInstance> startedProcesses = processInstanceRepository.findByStartedByOrderByStartedAtDesc(user.getUsername().trim());
+        if (startedProcesses.isEmpty()) {
+            return List.of();
+        }
+
+        List<String> processIds = startedProcesses.stream()
+                .map(ProcessInstance::getId)
+                .filter(id -> id != null && !id.isBlank())
+                .toList();
+        if (processIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<TaskInstance> allTasks = taskInstanceRepository.findByProcessInstanceIdIn(processIds);
+        if (allTasks.isEmpty()) {
+            return mapToProcessTaskGroups(startedProcesses, List.of(), true);
+        }
+
+        String clientLane = resolveUserLaneId(user);
+        String username = user.getUsername().trim();
+        List<TaskInstance> visibleTasks = allTasks.stream()
+                .filter(task -> {
+                    String taskLane = normalizeLaneId(task.getLaneId());
+                    boolean laneMatch = !clientLane.isBlank() && clientLane.equals(taskLane);
+                    boolean assignedToUser = task.getAssignedTo() != null && username.equals(task.getAssignedTo().trim());
+                    return laneMatch || assignedToUser;
+                })
+                .toList();
+
+        return mapToProcessTaskGroups(startedProcesses, visibleTasks, true);
     }
 
     public List<PendingTaskDto> getClientPendingTasks(User user) {
@@ -338,7 +423,9 @@ public class ProcessExecutionService {
                 .orElseThrow(() -> new RuntimeException("Politica no encontrada"));
 
         NodeTaskDefinition nodeDefinition = extractTaskDefinition(policy.getDiagramJson(), taskInstance.getTaskId());
-        String processName = policy.getName() != null ? policy.getName() : "Proceso";
+        String processName = processInstance.getTitle() != null && !processInstance.getTitle().isBlank()
+                ? processInstance.getTitle().trim()
+                : (policy.getName() != null ? policy.getName() : "Proceso");
         String taskName = nodeDefinition.taskName() != null && !nodeDefinition.taskName().isBlank()
                 ? nodeDefinition.taskName()
                 : workflowEngine.getNodeName(policy.getId(), taskInstance.getTaskId());
@@ -380,11 +467,14 @@ public class ProcessExecutionService {
                     String taskName = policyId.isBlank()
                             ? task.getTaskId()
                             : workflowEngine.getNodeName(policyId, task.getTaskId());
+                    String processName = process != null && process.getTitle() != null && !process.getTitle().isBlank()
+                            ? process.getTitle().trim()
+                            : (policy != null ? policy.getName() : "Proceso");
                     return new PendingTaskDto(
                             task.getId(),
                             task.getProcessInstanceId(),
                             policyId,
-                            policy != null ? policy.getName() : "Proceso",
+                            processName,
                             task.getTaskId(),
                             taskName,
                             task.getLaneId(),
@@ -394,6 +484,105 @@ public class ProcessExecutionService {
                 })
                 .sorted(Comparator.comparing(PendingTaskDto::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
                 .toList();
+    }
+
+    private List<ProcessTaskGroupDto> mapToProcessTaskGroups(
+            List<ProcessInstance> processes,
+            List<TaskInstance> tasks,
+            boolean includeEmptyGroups
+    ) {
+        if (processes == null || processes.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, ProcessInstance> processById = processes.stream()
+                .collect(Collectors.toMap(ProcessInstance::getId, process -> process, (left, right) -> left, LinkedHashMap::new));
+
+        Set<String> policyIds = processes.stream()
+                .map(ProcessInstance::getPolicyId)
+                .filter(policyId -> policyId != null && !policyId.isBlank())
+                .collect(Collectors.toSet());
+
+        Map<String, Policy> policyById = policyIds.isEmpty()
+                ? Collections.emptyMap()
+                : policyRepository.findAllById(policyIds).stream()
+                .collect(Collectors.toMap(Policy::getId, policy -> policy));
+
+        Map<String, List<TaskInstance>> tasksByProcess = tasks.stream()
+                .filter(task -> task.getProcessInstanceId() != null && !task.getProcessInstanceId().isBlank())
+                .collect(Collectors.groupingBy(TaskInstance::getProcessInstanceId));
+
+        List<ProcessTaskGroupDto> grouped = new ArrayList<>();
+
+        for (ProcessInstance process : processes) {
+            String processId = process.getId();
+            if (processId == null || processId.isBlank()) {
+                continue;
+            }
+            List<TaskInstance> processTasks = tasksByProcess.getOrDefault(processId, List.of());
+            if (processTasks.isEmpty() && !includeEmptyGroups) {
+                continue;
+            }
+
+            Policy policy = policyById.get(process.getPolicyId());
+            String policyName = policy != null && policy.getName() != null && !policy.getName().isBlank()
+                    ? policy.getName().trim()
+                    : "Proceso";
+            String processTitle = process.getTitle() != null && !process.getTitle().isBlank()
+                    ? process.getTitle().trim()
+                    : policyName;
+            String processDescription = process.getDescription() != null && !process.getDescription().isBlank()
+                    ? process.getDescription().trim()
+                    : (policy != null && policy.getDescription() != null ? policy.getDescription().trim() : "");
+
+            List<ProcessTaskDto> taskDtos = processTasks.stream()
+                    .map(task -> {
+                        String taskName = process.getPolicyId() == null || process.getPolicyId().isBlank()
+                                ? task.getTaskId()
+                                : workflowEngine.getNodeName(process.getPolicyId(), task.getTaskId());
+                        return new ProcessTaskDto(
+                                task.getId(),
+                                task.getTaskId(),
+                                taskName,
+                                task.getLaneId(),
+                                task.getStatus(),
+                                task.getCreatedAt(),
+                                task.getCompletedAt()
+                        );
+                    })
+                    .sorted(Comparator.comparing(ProcessTaskDto::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                    .toList();
+
+            grouped.add(new ProcessTaskGroupDto(
+                    processId,
+                    process.getPolicyId(),
+                    processTitle,
+                    processDescription,
+                    process.getStatus(),
+                    process.getStartedAt(),
+                    process.getCompletedAt(),
+                    taskDtos
+            ));
+        }
+
+        return grouped;
+    }
+
+    private String resolveProcessTitle(String requestedTitle, Policy policy) {
+        if (requestedTitle != null && !requestedTitle.isBlank()) {
+            return requestedTitle.trim();
+        }
+        if (policy != null && policy.getName() != null && !policy.getName().isBlank()) {
+            return policy.getName().trim();
+        }
+        return "Proceso";
+    }
+
+    private String resolveProcessDescription(String requestedDescription) {
+        if (requestedDescription == null) {
+            return "";
+        }
+        return requestedDescription.trim();
     }
 
     private NodeTaskDefinition extractTaskDefinition(String diagramJson, String taskId) {

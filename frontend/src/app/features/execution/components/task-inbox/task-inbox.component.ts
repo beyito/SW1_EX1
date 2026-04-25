@@ -1,7 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
+import { Router } from '@angular/router';
 import { AuthService } from '../../../../auth.service';
-import { PendingTaskDto } from '../../models/execution.models';
+import { ProcessTaskDto, ProcessTaskGroupDto } from '../../models/execution.models';
 import { ExecutionService } from '../../services/execution.service';
 
 @Component({
@@ -14,11 +15,12 @@ import { ExecutionService } from '../../services/execution.service';
 export class TaskInboxComponent implements OnInit {
   private readonly executionService = inject(ExecutionService);
   private readonly authService = inject(AuthService);
+  private readonly router = inject(Router);
 
-  public pendingTasks: PendingTaskDto[] = [];
-  public selectedTask: PendingTaskDto | null = null;
+  public processGroups: ProcessTaskGroupDto[] = [];
+  public selectedProcess: ProcessTaskGroupDto | null = null;
+  public selectedTask: ProcessTaskDto | null = null;
   public loading = false;
-  public completing = false;
   public message = '';
 
   public ngOnInit(): void {
@@ -32,19 +34,23 @@ export class TaskInboxComponent implements OnInit {
     try {
       const laneId = this.authService.getCurrentLaneId();
       if (!laneId) {
-        this.pendingTasks = [];
+        this.processGroups = [];
+        this.selectedProcess = null;
         this.selectedTask = null;
         this.message = 'Tu perfil no tiene area asignada para buscar tareas.';
         return;
       }
 
-      this.pendingTasks = await this.executionService.getMyPendingTasks(laneId);
-      this.selectedTask = this.pendingTasks.length > 0 ? this.pendingTasks[0] : null;
-      if (this.pendingTasks.length === 0) {
-        this.message = 'No tienes tareas pendientes.';
+      this.processGroups = await this.executionService.getMyProcessTaskGroups();
+      this.selectedProcess = this.processGroups.length > 0 ? this.processGroups[0] : null;
+      this.selectedTask = this.selectedProcess?.tasks[0] ?? null;
+
+      if (this.processGroups.length === 0) {
+        this.message = 'No tienes procesos activos con tareas.';
       }
     } catch (error) {
-      this.pendingTasks = [];
+      this.processGroups = [];
+      this.selectedProcess = null;
       this.selectedTask = null;
       this.message = error instanceof Error ? error.message : 'Error al cargar tareas';
     } finally {
@@ -52,25 +58,21 @@ export class TaskInboxComponent implements OnInit {
     }
   }
 
-  public selectTask(task: PendingTaskDto): void {
+  public selectProcess(group: ProcessTaskGroupDto): void {
+    this.selectedProcess = group;
+    this.selectedTask = group.tasks[0] ?? null;
+    this.message = '';
+  }
+
+  public selectTask(task: ProcessTaskDto): void {
     this.selectedTask = task;
     this.message = '';
   }
 
-  public async completeSelectedTask(): Promise<void> {
+  public openSelectedTask(): void {
     if (!this.selectedTask) {
       return;
     }
-    this.completing = true;
-    this.message = '';
-    try {
-      await this.executionService.completeTask(this.selectedTask.taskInstanceId, { aprobado: true });
-      this.message = 'Tarea completada correctamente.';
-      await this.loadMyTasks();
-    } catch (error) {
-      this.message = error instanceof Error ? error.message : 'No se pudo completar la tarea';
-    } finally {
-      this.completing = false;
-    }
+    void this.router.navigate(['/execution/task', this.selectedTask.taskInstanceId]);
   }
 }

@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { AuthService } from '../../../auth.service';
 import {
   PendingTaskDto,
+  ProcessTaskGroupDto,
   ProcessInstance,
   StartablePolicyDto,
   TaskDetailDto,
@@ -15,11 +16,11 @@ export class ExecutionService {
   private readonly authService = inject(AuthService);
   private readonly baseUrl = '/api/execution';
 
-  public async startProcess(policyId: string): Promise<ProcessInstance> {
+  public async startProcess(policyId: string, title: string, description: string): Promise<ProcessInstance> {
     const response = await fetch(`${this.baseUrl}/process/start`, {
       method: 'POST',
       headers: this.authHeaders,
-      body: JSON.stringify({ policyId })
+      body: JSON.stringify({ policyId, title, description })
     });
 
     if (!response.ok) {
@@ -64,6 +65,19 @@ export class ExecutionService {
     if (!response.ok) {
       const error = await response.text();
       throw new Error(error || 'No se pudieron cargar tus tareas pendientes');
+    }
+
+    return response.json();
+  }
+
+  public async getMyProcessTaskGroups(): Promise<ProcessTaskGroupDto[]> {
+    const response = await fetch(`${this.baseUrl}/my-processes/tasks`, {
+      headers: this.authHeaders
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(error || 'No se pudieron cargar tus procesos activos');
     }
 
     return response.json();
@@ -150,4 +164,3 @@ export class ExecutionService {
   }
   
 }
-

@@ -1,6 +1,7 @@
 package com.politicanegocio.core.controller;
 
 import com.politicanegocio.core.dto.PendingTaskDto;
+import com.politicanegocio.core.dto.ProcessTaskGroupDto;
 import com.politicanegocio.core.dto.StartablePolicyDto;
 import com.politicanegocio.core.dto.TaskDetailDto;
 import com.politicanegocio.core.model.Policy;
@@ -39,7 +40,14 @@ public class ProcessExecutionController {
             Authentication authentication
     ) {
         User user = getCurrentUser(authentication);
-        return ResponseEntity.ok(processExecutionService.startProcess(request.policyId(), user));
+        return ResponseEntity.ok(
+                processExecutionService.startProcess(
+                        request.policyId(),
+                        request.title(),
+                        request.description(),
+                        user
+                )
+        );
     }
 
     @PostMapping("/tasks/{taskInstanceId}/complete")
@@ -87,6 +95,12 @@ public class ProcessExecutionController {
         return ResponseEntity.ok(processExecutionService.getMyTasks(user));
     }
 
+    @GetMapping("/my-processes/tasks")
+    public ResponseEntity<List<ProcessTaskGroupDto>> getMyProcessTaskGroups(Authentication authentication) {
+        User user = getCurrentUser(authentication);
+        return ResponseEntity.ok(processExecutionService.getMyProcessTaskGroups(user));
+    }
+
     @GetMapping("/client/tasks/pending")
     @PreAuthorize("hasAuthority('CLIENT')")
     public ResponseEntity<List<PendingTaskDto>> getClientPendingTasks(Authentication authentication) {
@@ -105,7 +119,7 @@ public class ProcessExecutionController {
         return new StartablePolicyDto(policy.getId(), policy.getName(), policy.getDescription());
     }
 
-    private record StartProcessRequest(String policyId) {
+    private record StartProcessRequest(String policyId, String title, String description) {
     }
 
     private record CompleteTaskRequest(String formData) {
