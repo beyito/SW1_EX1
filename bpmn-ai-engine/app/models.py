@@ -21,6 +21,7 @@ class AgentRequest(BaseModel):
     current_diagram: Optional[Dict[str, Any]] = None
     lanes: List[LaneModel] = Field(default_factory=list)
     context: Dict[str, Any] = Field(default_factory=dict)
+    models: List[str] = Field(default_factory=list)
 
 
 class AgentResult(BaseModel):
@@ -34,5 +35,5 @@ class AgentResult(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     model: str
+    available_models: List[str] = Field(default_factory=list)
     ai_provider_configured: bool
-

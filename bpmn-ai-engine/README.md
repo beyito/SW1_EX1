@@ -35,6 +35,7 @@ bpmn-ai-engine/
 - `AI_ENGINE_ALLOWED_ORIGINS`
 - `AI_API_KEY`
 - `AI_MODEL` (por defecto sugerido: `gemini-3.1-flash-lite`)
+- `AI_MODELS` (lista separada por comas para fallback automatico)
 - `AI_TIMEOUT_SECONDS`
 - `AI_BASE_URL` (para Gemini OpenAI-compatible: `https://generativelanguage.googleapis.com/v1beta/openai/`)
 
@@ -81,7 +82,10 @@ Backend se conecta internamente al microservicio usando:
 
 ### `GET /health`
 
-Estado del servicio y proveedor IA.
+Estado del servicio y proveedor IA. Incluye:
+
+- `model`: modelo primario
+- `available_models`: lista completa de modelos configurados
 
 ### `POST /api/v1/agent/diagram`
 
@@ -96,6 +100,7 @@ Request:
 ```json
 {
   "userMessage": "Analiza mi diagrama y dime errores",
+  "models": ["gemini-3.1-flash-lite-preview", "gemini-2.5-flash"],
   "currentDiagram": {
     "cells": []
   }
@@ -113,6 +118,26 @@ Response:
   ]
 }
 ```
+
+## Fallback de modelos
+
+El microservicio intenta responder usando una lista ordenada de modelos:
+
+1. `models` enviados en la request (si existen)
+2. `AI_MODELS`
+3. `AI_MODEL` como ultimo respaldo
+
+Si un modelo falla por cuota/alta demanda, intenta el siguiente automaticamente.
+
+## Sobre las llamadas frecuentes a `/health`
+
+Si usas Docker Compose, esas llamadas las hace el `healthcheck` del contenedor.
+Ahora quedaron configurables con:
+
+- `AI_ENGINE_HEALTHCHECK_INTERVAL` (default `60s`)
+- `AI_ENGINE_HEALTHCHECK_TIMEOUT` (default `5s`)
+- `AI_ENGINE_HEALTHCHECK_RETRIES` (default `3`)
+- `AI_ENGINE_HEALTHCHECK_START_PERIOD` (default `25s`)
 
 ## Nota de integracion
 

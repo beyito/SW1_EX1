@@ -63,15 +63,17 @@ services:
       AI_ENGINE_ALLOWED_ORIGINS: ${AI_ENGINE_ALLOWED_ORIGINS}
       AI_API_KEY: ${AI_API_KEY}
       AI_MODEL: ${AI_MODEL}
+      AI_MODELS: ${AI_MODELS}
       AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS}
       AI_BASE_URL: ${AI_BASE_URL}
     ports:
       - "8010:8010"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8010/health', timeout=5)"]
-      interval: 15s
-      timeout: 5s
-      retries: 10
+      interval: ${AI_ENGINE_HEALTHCHECK_INTERVAL:-60s}
+      timeout: ${AI_ENGINE_HEALTHCHECK_TIMEOUT:-5s}
+      retries: ${AI_ENGINE_HEALTHCHECK_RETRIES:-3}
+      start_period: ${AI_ENGINE_HEALTHCHECK_START_PERIOD:-25s}
     networks:
       - bpmn-net
 

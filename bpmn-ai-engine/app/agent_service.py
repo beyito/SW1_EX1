@@ -29,6 +29,21 @@ class DiagramAgentService:
     def ai_enabled(self) -> bool:
         return self.client is not None
 
+    def _resolve_model_candidates(self, requested_models: Optional[List[str]] = None) -> List[str]:
+        candidates: List[str] = []
+        if requested_models:
+            candidates.extend([model.strip() for model in requested_models if model and model.strip()])
+        candidates.extend(self.settings.ai_models)
+
+        deduped: List[str] = []
+        seen = set()
+        for model in candidates:
+            if model in seen:
+                continue
+            seen.add(model)
+            deduped.append(model)
+        return deduped or [self.settings.ai_model]
+
     def process(self, request: AgentRequest) -> AgentResult:
         if request.operation == "create":
             base_diagram = create_default_diagram()
@@ -102,17 +117,30 @@ IMPORTANTE: Las claves 'changes' y 'warnings' DEBEN ser listas de STRINGS, NO ob
             "current_diagram": base_diagram,
         }
 
-        response = self.client.chat.completions.create(
-            model=self.settings.ai_model,
-            temperature=0.1,
-            response_format={ "type": "json_object" },
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": json.dumps(user_payload, ensure_ascii=True)},
-            ],
-        )
-        
-        raw_text = (response.choices[0].message.content or "").strip()
+        last_error: Optional[Exception] = None
+        raw_text = ""
+        for model in self._resolve_model_candidates(request.models):
+            try:
+                response = self.client.chat.completions.create(
+                    model=model,
+                    temperature=0.1,
+                    response_format={"type": "json_object"},
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": json.dumps(user_payload, ensure_ascii=True)},
+                    ],
+                )
+                raw_text = (response.choices[0].message.content or "").strip()
+                if raw_text:
+                    break
+            except Exception as exc:
+                last_error = exc
+                continue
+
+        if not raw_text:
+            if last_error:
+                raise last_error
+            raise RuntimeError("La IA no devolvio contenido.")
         
         # Limpieza de markdown usando replace para evitar cortes
         if "```json" in raw_text:

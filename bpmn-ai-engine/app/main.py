@@ -42,6 +42,7 @@ openai_client = OpenAI(
 class CopilotRequest(BaseModel):
     userMessage: str = Field(..., min_length=1)
     currentDiagram: Dict[str, Any] = Field(default_factory=dict)
+    models: List[str] = Field(default_factory=list)
 
 
 class CopilotResponse(BaseModel):
@@ -54,8 +55,25 @@ def health() -> HealthResponse:
     return HealthResponse(
         status="ok",
         model=settings.ai_model,
+        available_models=settings.ai_models,
         ai_provider_configured=agent_service.ai_enabled,
     )
+
+
+def _resolve_model_candidates(requested_models: List[str]) -> List[str]:
+    candidates: List[str] = []
+    if requested_models:
+        candidates.extend([model.strip() for model in requested_models if model and model.strip()])
+    candidates.extend(settings.ai_models)
+
+    deduped: List[str] = []
+    seen = set()
+    for model in candidates:
+        if model in seen:
+            continue
+        seen.add(model)
+        deduped.append(model)
+    return deduped or [settings.ai_model]
 
 
 @app.post("/api/v1/agent/diagram", response_model=AgentResult)
@@ -78,7 +96,7 @@ def copilot_chat(payload: CopilotRequest, http_request: Request) -> CopilotRespo
         request_id,
         len(payload.userMessage or ""),
         cell_count,
-        settings.ai_model,
+        settings.ai_models[0] if settings.ai_models else settings.ai_model,
     )
 
     if openai_client is None:
@@ -109,15 +127,36 @@ def copilot_chat(payload: CopilotRequest, http_request: Request) -> CopilotRespo
     }
 
     try:
-        completion = openai_client.chat.completions.create(
-            model=settings.ai_model,
-            temperature=0.2,
-            response_format={"type": "json_object"},
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": json.dumps(user_payload, ensure_ascii=True)},
-            ],
-        )
+        completion = None
+        selected_model = ""
+        last_error: Exception | None = None
+        for model in _resolve_model_candidates(payload.models):
+            try:
+                completion = openai_client.chat.completions.create(
+                    model=model,
+                    temperature=0.2,
+                    response_format={"type": "json_object"},
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": json.dumps(user_payload, ensure_ascii=True)},
+                    ],
+                )
+                selected_model = model
+                break
+            except Exception as model_exception:
+                last_error = model_exception
+                logger.warning(
+                    "copilot_chat model failed request_id=%s model=%s error=%s",
+                    request_id,
+                    model,
+                    model_exception,
+                )
+                continue
+
+        if completion is None:
+            if last_error is not None:
+                raise last_error
+            raise RuntimeError("No se obtuvo respuesta de ningun modelo configurado.")
     except Exception as exception:
         logger.exception("copilot_chat error in ai_provider_call request_id=%s", request_id)
         raise HTTPException(
@@ -157,8 +196,9 @@ def copilot_chat(payload: CopilotRequest, http_request: Request) -> CopilotRespo
     actions_raw = parsed.get("suggested_actions", [])
     suggested_actions = [str(item).strip() for item in actions_raw if str(item).strip()] if isinstance(actions_raw, list) else []
     logger.info(
-        "copilot_chat success: request_id=%s suggested_actions=%s",
+        "copilot_chat success: request_id=%s model=%s suggested_actions=%s",
         request_id,
+        selected_model,
         len(suggested_actions),
     )
 
