@@ -36,12 +36,42 @@ services:
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       MAX_UPLOAD_SIZE: ${MAX_UPLOAD_SIZE}
       MAX_REQUEST_SIZE: ${MAX_REQUEST_SIZE}
+      AI_ENGINE_BASE_URL: ${AI_ENGINE_BASE_URL}
       JAVA_OPTS: ${JAVA_OPTS}
     ports:
       - "8080:8080"
     depends_on:
+      bpmn-ai-engine:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    networks:
+      - bpmn-net
+
+  bpmn-ai-engine:
+    build:
+      context: ..
+      dockerfile: bpmn-ai-engine/Dockerfile
+    container_name: bpmn-ai-engine
+    environment:
+      AI_ENGINE_APP_NAME: ${AI_ENGINE_APP_NAME}
+      AI_ENGINE_APP_VERSION: ${AI_ENGINE_APP_VERSION}
+      AI_ENGINE_HOST: ${AI_ENGINE_HOST}
+      AI_ENGINE_PORT: ${AI_ENGINE_PORT}
+      AI_ENGINE_RELOAD: ${AI_ENGINE_RELOAD}
+      AI_ENGINE_LOG_LEVEL: ${AI_ENGINE_LOG_LEVEL}
+      AI_ENGINE_ALLOWED_ORIGINS: ${AI_ENGINE_ALLOWED_ORIGINS}
+      AI_API_KEY: ${AI_API_KEY}
+      AI_MODEL: ${AI_MODEL}
+      AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS}
+      AI_BASE_URL: ${AI_BASE_URL}
+    ports:
+      - "8010:8010"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8010/health', timeout=5)"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
     networks:
       - bpmn-net
 

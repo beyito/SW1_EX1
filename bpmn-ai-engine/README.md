@@ -47,6 +47,36 @@ pip install -r requirements.txt
 uvicorn app.main:app --host 0.0.0.0 --port 8010 --reload
 ```
 
+## Docker
+
+### Build imagen
+
+```bash
+docker build -f bpmn-ai-engine/Dockerfile -t bpmn-ai-engine:local .
+```
+
+### Run standalone
+
+```bash
+docker run --rm -p 8010:8010 \
+  -e AI_API_KEY=your-key \
+  -e AI_MODEL=gemini-3.1-flash-lite \
+  -e AI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/ \
+  bpmn-ai-engine:local
+```
+
+### Run integrado con stack
+
+Desde `infra/`:
+
+```bash
+docker compose up --build
+```
+
+Backend se conecta internamente al microservicio usando:
+
+- `AI_ENGINE_BASE_URL=http://bpmn-ai-engine:8010`
+
 ## Endpoints
 
 ### `GET /health`

@@ -54,6 +54,7 @@
 
 - `frontend` (Nginx): exposes `:4200` -> serves Angular.
 - `backend` (Spring): exposes `:8080` -> REST/GraphQL/WebSocket.
+- `bpmn-ai-engine` (FastAPI): exposes `:8010` -> IA copilot and diagram assistant.
 - `rabbitmq`: exposes `:5672` (`STOMP relay`) and `:15672` (`management UI`).
 - MongoDB is currently external via `MONGODB_URI` (Atlas/self-managed).
 
@@ -90,7 +91,7 @@ All services share network `bpmn-net`.
 - Frontend Angular consume:
   - `POST /api/copilot/chat` (Spring Boot)
 - Spring Boot reenvía a:
-  - `POST http://localhost:8010/api/ai/copilot-chat`
+  - `POST http://bpmn-ai-engine:8010/api/ai/copilot-chat` (en Docker network)
 
 ## Notes for ECS/Fargate
 
