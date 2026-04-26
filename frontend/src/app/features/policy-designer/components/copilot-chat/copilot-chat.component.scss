@@ -1,6 +1,7 @@
 :host {
   display: block;
   height: 100%;
+  min-height: 0;
 }
 
 .copilot-shell {
@@ -10,7 +11,9 @@
   gap: 10px;
   padding: 12px;
   background: #ffffff;
-  border-left: 1px solid var(--color-border);
+  border-left: none;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .copilot-header {
@@ -32,6 +35,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-height: 0;
 }
 
 .empty-hint {
@@ -152,7 +156,9 @@ textarea {
   border: 1px solid #d1d5db;
   border-radius: 8px;
   padding: 8px 10px;
-  resize: vertical;
+  resize: none;
+  max-height: 120px;
+  overflow: auto;
   font: inherit;
   color: var(--color-text-main);
 }

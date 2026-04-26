@@ -4,8 +4,8 @@ import { Lane, LinkCondition, PolicyPayload } from '../models/policy-designer.mo
 
 @Injectable({ providedIn: 'root' })
 export class DiagramCanvasService {
-  private canvasWidth = 1200;
-  private canvasHeight = 800;
+  private readonly canvasWidth = 1200;
+  private readonly canvasHeight = 800;
   private laneBackgrounds: dia.Element[] = [];
 
   public getCanvasWidth(): number {
@@ -14,11 +14,6 @@ export class DiagramCanvasService {
 
   public getCanvasHeight(): number {
     return this.canvasHeight;
-  }
-
-  public setCanvasDimensions(width: number, height: number): void {
-    this.canvasWidth = Math.max(320, Math.floor(width));
-    this.canvasHeight = Math.max(240, Math.floor(height));
   }
 
   public createGraph(): dia.Graph {
@@ -57,8 +52,8 @@ export class DiagramCanvasService {
       },
 
       // 🚩 3. PERMISOS INTERACTIVOS (AQUÍ ESTABA EL BLOQUEO)
-      interactive: () => ({
-        elementMove: true,
+      interactive: (cellView) => ({
+        elementMove: !cellView.model.get('isLaneBackground'),
         addLinkFromMagnet: false,
         labelMove: false,
         linkMove: false,      // Cambiamos a false para no arrastrar la flecha entera por error
@@ -307,11 +302,12 @@ public renderLaneBackgrounds(graph: dia.Graph, lanes: Lane[]): void {
       return;
     }
 
-    const laneWidth = this.getLaneWidth(lanes.length);
+    const normalizedLanes = this.normalizeLaneGeometry(lanes);
     const headerHeight = 44; 
 
-    lanes.forEach((lane, index) => {
-      const positionX = index * laneWidth;
+    normalizedLanes.forEach((lane) => {
+      const laneWidth = this.getLaneWidth(lane, normalizedLanes.length);
+      const positionX = (lane.x ?? laneWidth / 2) - laneWidth / 2;
       
       // 🚩 Usamos HeaderedRectangle: Es UN SOLO elemento indivisible
       const laneShape = new shapes.standard.HeaderedRectangle({
@@ -419,10 +415,11 @@ public renderLaneBackgrounds(graph: dia.Graph, lanes: Lane[]): void {
   }
 
   public recalculateLanePositions(lanes: Lane[]): Lane[] {
-    const laneWidth = this.getLaneWidth(lanes.length);
+    const laneWidth = this.getDefaultLaneWidth(lanes.length);
     return lanes.map((lane, index) => ({
       ...lane,
-      x: index * laneWidth + laneWidth / 2
+      x: index * laneWidth + laneWidth / 2,
+      width: laneWidth
     }));
   }
 
@@ -430,10 +427,15 @@ public renderLaneBackgrounds(graph: dia.Graph, lanes: Lane[]): void {
     if (lanes.length === 0) {
       return null;
     }
-
-    const laneWidth = this.getLaneWidth(lanes.length);
-    const index = Math.max(0, Math.min(lanes.length - 1, Math.floor(x / laneWidth)));
-    return lanes[index]?.id ?? null;
+    const normalizedLanes = this.normalizeLaneGeometry(lanes);
+    const lane = normalizedLanes.find((item) => {
+      const width = this.getLaneWidth(item, normalizedLanes.length);
+      const center = item.x ?? width / 2;
+      const left = center - width / 2;
+      const right = center + width / 2;
+      return x >= left && x <= right;
+    });
+    return lane?.id ?? normalizedLanes[normalizedLanes.length - 1]?.id ?? null;
   }
 
   public getCanvasRect(paper: dia.Paper): DOMRect {
@@ -443,19 +445,6 @@ public renderLaneBackgrounds(graph: dia.Graph, lanes: Lane[]): void {
   public clearLaneBackgrounds(): void {
     this.laneBackgrounds.forEach((background) => background.remove());
     this.laneBackgrounds = [];
-  }
-
-  public updateLaneBackgroundLayout(lanes: Lane[]): void {
-    if (lanes.length === 0 || this.laneBackgrounds.length !== lanes.length) {
-      return;
-    }
-
-    const laneWidth = this.getLaneWidth(lanes.length);
-    this.laneBackgrounds.forEach((background, index) => {
-      background.position(index * laneWidth, 0);
-      background.resize(laneWidth, this.canvasHeight);
-      background.attr('headerText/text', lanes[index].name.toUpperCase());
-    });
   }
 
   public updateNodeLabel(element: dia.Element, newLabel: string): void {
@@ -520,7 +509,24 @@ public renderLaneBackgrounds(graph: dia.Graph, lanes: Lane[]): void {
     return value.replace(/'/g, "\\'");
   }
 
-  private getLaneWidth(laneCount: number): number {
+  private normalizeLaneGeometry(lanes: Lane[]): Lane[] {
+    if (lanes.length === 0) {
+      return [];
+    }
+
+    const hasGeometry = lanes.every((lane) => Number.isFinite(lane.x) && Number.isFinite(lane.width) && (lane.width ?? 0) > 0);
+    if (!hasGeometry) {
+      return this.recalculateLanePositions(lanes);
+    }
+
+    return [...lanes].sort((a, b) => (a.x ?? 0) - (b.x ?? 0));
+  }
+
+  private getLaneWidth(lane: Lane, laneCount: number): number {
+    return lane.width && lane.width > 0 ? lane.width : this.getDefaultLaneWidth(laneCount);
+  }
+
+  private getDefaultLaneWidth(laneCount: number): number {
     return laneCount > 0 ? this.canvasWidth / laneCount : this.canvasWidth;
   }
 }

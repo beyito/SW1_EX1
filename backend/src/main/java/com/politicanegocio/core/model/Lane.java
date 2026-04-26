@@ -8,4 +8,5 @@ public class Lane {
     private String name;
     private String color;
     private Double x;
+    private Double width;
 }

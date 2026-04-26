@@ -4,8 +4,9 @@ from copy import deepcopy
 from typing import Any, Dict, List, Tuple
 from uuid import uuid4
 
-ALLOWED_NODE_TYPES = {"START", "TASK", "DECISION", "FORK", "JOIN", "END"}
+ALLOWED_NODE_TYPES = {"START", "TASK", "DECISION", "FORK", "JOIN", "SYNCHRONIZATION", "END"}
 DEFAULT_NODE_SIZE = {"width": 140, "height": 70}
+DEFAULT_POSITION = {"x": 100, "y": 100}
 
 def create_default_diagram() -> Dict[str, Any]:
     start_id = str(uuid4())
@@ -32,6 +33,7 @@ def sanitize_diagram(diagram: Dict[str, Any], lanes: List[Dict[str, Any]] | None
 
     filtered_cells: List[Dict[str, Any]] = []
     node_ids = set()
+    node_lookup: Dict[str, str] = {}
     lane_ids = {lane.get("id") for lane in (lanes or []) if isinstance(lane, dict) and lane.get("id")}
 
     # Primer paso: Procesar Nodos
@@ -46,12 +48,30 @@ def sanitize_diagram(diagram: Dict[str, Any], lanes: List[Dict[str, Any]] | None
                 continue
             
             cell_id = cell.get("id")
-            if cell_id: node_ids.add(str(cell_id))
+            if cell_id:
+                node_id = str(cell_id)
+                node_ids.add(node_id)
+                node_lookup[_normalize_ref(node_id)] = node_id
+
+            label_text = ((cell.get("attrs") or {}).get("label") or {}).get("text")
+            if isinstance(label_text, str) and label_text.strip() and cell_id:
+                node_lookup[_normalize_ref(label_text)] = str(cell_id)
             
-            # Validar pertenencia a carriles
-            if lane_ids and cell.get("laneId") and cell.get("laneId") not in lane_ids:
-                warnings.append(f"Corrigiendo laneId inválido para el nodo {cell_id}.")
-                cell["laneId"] = next(iter(lane_ids))
+            # DEFENSIVA 1: Validar y forzar pertenencia a carriles
+            if lane_ids:
+                current_lane = cell.get("laneId")
+                if not current_lane or current_lane not in lane_ids:
+                    warnings.append(f"Corrigiendo laneId faltante o inválido para el nodo {cell_id}.")
+                    cell["laneId"] = next(iter(lane_ids))
+            
+            # DEFENSIVA 2: Proteger formato de Size y Position
+            if not isinstance(cell.get("size"), dict):
+                cell["size"] = DEFAULT_NODE_SIZE
+                warnings.append(f"Corrigiendo formato de tamaño en nodo {cell_id}.")
+                
+            if not isinstance(cell.get("position"), dict):
+                cell["position"] = DEFAULT_POSITION
+                warnings.append(f"Corrigiendo formato de posición en nodo {cell_id}.")
             
             filtered_cells.append(cell)
             continue
@@ -65,8 +85,25 @@ def sanitize_diagram(diagram: Dict[str, Any], lanes: List[Dict[str, Any]] | None
             valid_cells.append(cell)
             continue
 
-        source_id = ((cell.get("source") or {}).get("id") or "").strip()
-        target_id = ((cell.get("target") or {}).get("id") or "").strip()
+        # DEFENSIVA 3: Extraer origin/target incluso si la IA lo mandó como string
+        source_val = cell.get("source")
+        target_val = cell.get("target")
+
+        raw_source_id = source_val if isinstance(source_val, str) else (source_val or {}).get("id", "")
+        raw_target_id = target_val if isinstance(target_val, str) else (target_val or {}).get("id", "")
+
+        source_id = str(raw_source_id).strip()
+        target_id = str(raw_target_id).strip()
+
+        resolved_source = _resolve_node_ref(source_id, node_ids, node_lookup)
+        resolved_target = _resolve_node_ref(target_id, node_ids, node_lookup)
+        
+        if resolved_source and resolved_target:
+            # Reconstruir como objeto estricto
+            cell["source"] = {"id": resolved_source}
+            cell["target"] = {"id": resolved_target}
+            source_id = resolved_source
+            target_id = resolved_target
         
         if source_id in node_ids and target_id in node_ids:
             valid_cells.append(cell)
@@ -92,7 +129,15 @@ def _build_node(node_id: str, node_type: str, label: str, x: int, y: int) -> Dic
     elif node_type == "DECISION":
         shape = "standard.Polygon"
         size = {"width": 120, "height": 120}
-        color = {"stroke": "#b45309", "fill": "#fbbf24"}
+        color = {"stroke": "#b45309", "fill": "#fbbf24", "refPoints": "0,60 60,0 120,60 60,120"} # FIX: refPoints agregado
+    elif node_type == "FORK":
+        shape = "standard.Rectangle"
+        size = {"width": 20, "height": 160}
+        color = {"stroke": "#1f2937", "fill": "#1f2937"}
+    elif node_type in {"JOIN", "SYNCHRONIZATION"}:
+        shape = "standard.Rectangle"
+        size = {"width": 160, "height": 20}
+        color = {"stroke": "#374151", "fill": "#374151"}
     else:
         shape = "standard.Rectangle"
         size = DEFAULT_NODE_SIZE
@@ -120,6 +165,12 @@ def _build_node(node_id: str, node_type: str, label: str, x: int, y: int) -> Dic
     
     if node_type == "TASK":
         node["nodeMeta"] = {"taskForm": {"title": "", "description": "", "fields": [], "attachments": []}}
+
+    if node_type in {"FORK", "JOIN", "SYNCHRONIZATION"}:
+        node["attrs"]["label"]["fill"] = "#ffffff"
+        node["attrs"]["label"]["fontWeight"] = "700"
+        node["attrs"]["body"]["rx"] = 0
+        node["attrs"]["body"]["ry"] = 0
     
     return node
 
@@ -136,7 +187,17 @@ def _build_link(source_id: str, target_id: str) -> Dict[str, Any]:
             "line": {
                 "stroke": "#0f172a",
                 "strokeWidth": 3,
-                "targetMarker": {"fill": "#0f172a", "stroke": "#0f172a"}
+                "targetMarker": {"type": "path", "d": "M 10 -5 0 0 10 5 z", "fill": "#0f172a", "stroke": "#0f172a", "stroke-width": 1}
             }
         }
     }
+
+def _resolve_node_ref(raw_ref: str, node_ids: set[str], node_lookup: Dict[str, str]) -> str:
+    if not raw_ref:
+        return ""
+    if raw_ref in node_ids:
+        return raw_ref
+    return node_lookup.get(_normalize_ref(raw_ref), "")
+
+def _normalize_ref(value: str) -> str:
+    return "".join(ch.lower() for ch in str(value) if ch.isalnum())

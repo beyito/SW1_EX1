@@ -8,12 +8,11 @@ import { DiagramCanvasService } from '../../services/diagram-canvas.service';
 import { DiagramStorageService } from '../../services/diagram-storage.service';
 import { PolicyDataService } from '../../services/policy-data.service';
 import { WebSocketService } from '../../services/web-socket.service';
-import { Attachment, CompanyArea, Lane, PolicyPayload, FormField, TaskExecutionOrder, LinkCondition, LinkConditionUpdate } from '../../models/policy-designer.models';
+import { CompanyArea, Lane, PolicyPayload, FormField, TaskExecutionOrder, LinkCondition, LinkConditionUpdate } from '../../models/policy-designer.models';
 import { DiagramEvent } from '../../models/diagram-event.model';
 import { NODE_TEMPLATES } from '../../utils/policy-designer.constants';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { CompanyAreaService } from '../../services/company-area.service';
-import { FileService } from '../../services/file.service';
 import { CopilotService } from '../../services/copilot.service';
 import { LinkPropertiesPanelComponent } from '../link-properties-panel/link-properties-panel.component';
 import { CopilotChatComponent, CopilotChatMessage } from '../copilot-chat/copilot-chat.component';
@@ -34,7 +33,6 @@ export class PolicyDesignerComponent implements OnInit, AfterViewInit, OnDestroy
   private readonly diagramStorageService = inject(DiagramStorageService);
   private readonly companyAreaService = inject(CompanyAreaService);
   private readonly webSocketService = inject(WebSocketService);
-  private readonly fileService = inject(FileService);
   private readonly copilotService = inject(CopilotService);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly route = inject(ActivatedRoute);
@@ -57,6 +55,8 @@ export class PolicyDesignerComponent implements OnInit, AfterViewInit, OnDestroy
   // 🚩 Variable para controlar el recuadro de redimensionamiento
   private freeTransform: any = null;
   private resizeObserver: ResizeObserver | null = null;
+  private laneGeometrySyncTimeout: ReturnType<typeof setTimeout> | null = null;
+  private laneGeometryCaptureTimeout: ReturnType<typeof setTimeout> | null = null;
   private readonly minZoom = 0.2;
   private readonly maxZoom = 2.0;
   private readonly zoomStep = 0.1;
@@ -84,7 +84,6 @@ export class PolicyDesignerComponent implements OnInit, AfterViewInit, OnDestroy
   public selectedTaskFormTitle = '';
   public selectedTaskFormDescription = '';
   public selectedTaskFormFields: FormField[] = [];
-  public selectedTaskAttachments: Attachment[] = [];
   public selectedDecisionExpression = '';
   public selectedLinkCondition: LinkCondition | null = null;
   public selectedLinkConditionLabel = '';
@@ -102,6 +101,7 @@ export class PolicyDesignerComponent implements OnInit, AfterViewInit, OnDestroy
   public copilotLoading = false;
   public copilotMessages: CopilotChatMessage[] = [];
   public copilotConversationId: string | null = null;
+  public isCopilotOpen = false;
 
   public ngOnInit(): void {
     this.registerPaperEvents();
@@ -119,6 +119,14 @@ export class PolicyDesignerComponent implements OnInit, AfterViewInit, OnDestroy
 
   public ngOnDestroy(): void {
     this.stopCanvasPanning();
+    if (this.laneGeometryCaptureTimeout) {
+      clearTimeout(this.laneGeometryCaptureTimeout);
+      this.laneGeometryCaptureTimeout = null;
+    }
+    if (this.laneGeometrySyncTimeout) {
+      clearTimeout(this.laneGeometrySyncTimeout);
+      this.laneGeometrySyncTimeout = null;
+    }
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
     this.cellSyncTimeouts.forEach((timeoutId) => clearTimeout(timeoutId));
@@ -129,6 +137,14 @@ export class PolicyDesignerComponent implements OnInit, AfterViewInit, OnDestroy
     }
     this.policySubscription?.unsubscribe();
     this.webSocketService.disconnect();
+  }
+
+  public toggleCopilotChat(): void {
+    this.isCopilotOpen = !this.isCopilotOpen;
+  }
+
+  public closeCopilotChat(): void {
+    this.isCopilotOpen = false;
   }
 
   @HostListener('wheel', ['$event'])
@@ -172,13 +188,8 @@ export class PolicyDesignerComponent implements OnInit, AfterViewInit, OnDestroy
       const nextWidth = Math.max(320, Math.floor(width));
       const nextHeight = Math.max(240, Math.floor(height));
 
+      // Solo cambia el viewport visible del Paper; no recalcula geometria del diagrama.
       this.paper.setDimensions(nextWidth, nextHeight);
-      this.diagramCanvasService.setCanvasDimensions(nextWidth, nextHeight);
-
-      if (this.lanes.length > 0) {
-        this.lanes = this.diagramCanvasService.recalculateLanePositions(this.lanes);
-        this.diagramCanvasService.updateLaneBackgroundLayout(this.lanes);
-      }
     };
 
     const initialRect = canvasElement.getBoundingClientRect();
@@ -226,6 +237,7 @@ export class PolicyDesignerComponent implements OnInit, AfterViewInit, OnDestroy
 
   private showElementTools(elementView: dia.ElementView): void {
     this.clearTools();
+    const isLaneBackground = Boolean((elementView.model as any).get?.('isLaneBackground'));
 
     // 1. Botón de Eliminar (se mantiene igual)
     const toolsView = new dia.ToolsView({
@@ -248,12 +260,12 @@ export class PolicyDesignerComponent implements OnInit, AfterViewInit, OnDestroy
       preserveAspectRatio: false, 
       
       // Opcional: Define un tamaño mínimo para que el nodo no desaparezca al achicarlo
-      minWidth: 50,
-      minHeight: 30,
+      minWidth: isLaneBackground ? 120 : 50,
+      minHeight: isLaneBackground ? this.diagramCanvasService.getCanvasHeight() : 30,
       
       // Opcional: Puedes especificar qué puntos de agarre quieres mostrar
       // 'nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'
-      directions: ['e', 'w', 's', 'n', 'nw', 'ne', 'se', 'sw'] 
+      directions: isLaneBackground ? ['e', 'w'] : ['e', 'w', 's', 'n', 'nw', 'ne', 'se', 'sw']
     });
     
     this.freeTransform.render();
@@ -448,14 +460,8 @@ private showLinkTools(linkView: dia.LinkView): void {
 
   private registerGraphEvents(): void {
     this.graph.on('change:size', (element: dia.Element, newSize: dia.Size) => {
-      if (element.get('isLaneBackground')) {
-        const children = element.getEmbeddedCells();
-        children.forEach(child => {
-          // Ajustamos el ancho del cuerpo al mismo ancho de la cabecera
-          if (child.isElement()) {
-            child.resize(newSize.width, 800 - newSize.height);
-          }
-        });
+      if (this.isLaneCell(element)) {
+        this.scheduleLaneGeometryCapture();
         return;
       }
 
@@ -468,7 +474,7 @@ private showLinkTools(linkView: dia.LinkView): void {
       }
     });
     this.graph.on('add', (cell: dia.Cell) => {
-      if (this.isRemoteChange || this.isApplyingPolicySnapshot || !this.selectedPolicyId) {
+      if (this.isRemoteChange || this.isApplyingPolicySnapshot || !this.selectedPolicyId || this.isLaneCell(cell)) {
         return;
       }
 
@@ -485,7 +491,7 @@ private showLinkTools(linkView: dia.LinkView): void {
     });
 
     this.graph.on('remove', (cell: dia.Cell) => {
-      if (this.isRemoteChange || this.isApplyingPolicySnapshot || !this.selectedPolicyId) {
+      if (this.isRemoteChange || this.isApplyingPolicySnapshot || !this.selectedPolicyId || this.isLaneCell(cell)) {
         return;
       }
 
@@ -501,6 +507,11 @@ private showLinkTools(linkView: dia.LinkView): void {
     });
 
     this.graph.on('change:position', (cell: dia.Cell) => {
+      if (this.isLaneCell(cell)) {
+        this.scheduleLaneGeometryCapture();
+        return;
+      }
+
       if (this.isRemoteChange || this.isApplyingPolicySnapshot || !this.selectedPolicyId || !cell.isElement()) {
         return;
       }
@@ -598,6 +609,7 @@ private showLinkTools(linkView: dia.LinkView): void {
 
     this.lanes = this.diagramCanvasService.recalculateLanePositions([...this.lanes, lane]);
     this.diagramCanvasService.renderLaneBackgrounds(this.graph, this.lanes);
+    this.broadcastLaneLayoutSync();
     this.selectedAreaId = '';
     this.infoMessage = `Calle "${lane.name}" agregada.`;
     this.scheduleLocalSave();
@@ -606,6 +618,7 @@ private showLinkTools(linkView: dia.LinkView): void {
   public removeLane(laneId: string): void {
     this.lanes = this.diagramCanvasService.recalculateLanePositions(this.lanes.filter((lane) => lane.id !== laneId));
     this.diagramCanvasService.renderLaneBackgrounds(this.graph, this.lanes);
+    this.broadcastLaneLayoutSync();
     this.infoMessage = 'Calle eliminada.';
     this.scheduleLocalSave();
   }
@@ -863,7 +876,6 @@ private showLinkTools(linkView: dia.LinkView): void {
     this.selectedTaskFormTitle = nodeMeta.taskForm?.title ?? '';
     this.selectedTaskFormDescription = nodeMeta.taskForm?.description ?? '';
     this.selectedTaskFormFields = [...(nodeMeta.taskForm?.fields ?? [])];
-    this.selectedTaskAttachments = [...(nodeMeta.taskForm?.attachments ?? [])];
     this.selectedDecisionExpression = nodeMeta.decisionExpression ?? '';
   }
 
@@ -884,8 +896,7 @@ private showLinkTools(linkView: dia.LinkView): void {
       nodeMeta.taskForm = {
         title: this.selectedTaskFormTitle,
         description: this.selectedTaskFormDescription,
-        fields: [...this.selectedTaskFormFields],
-        attachments: [...this.selectedTaskAttachments]
+        fields: [...this.selectedTaskFormFields]
       };
     }
 
@@ -985,38 +996,6 @@ private showLinkTools(linkView: dia.LinkView): void {
   public editField(index: number): void {
     // Por ahora solo mostramos un mensaje, pero podríamos implementar edición inline
     this.infoMessage = `Para editar "${this.selectedTaskFormFields[index].label}", elimina y vuelve a crear el campo.`;
-  }
-
-  public async onTaskAttachmentChange(event: Event): Promise<void> {
-    const input = event.target as HTMLInputElement;
-    if (!input.files?.length) {
-      return;
-    }
-
-    for (let i = 0; i < input.files.length; i++) {
-      const file = input.files[i];
-      try {
-        const uploaded = await this.fileService.uploadAttachment(file, this.selectedPolicyId ?? undefined);
-        this.selectedTaskAttachments.push({
-          id: `${Date.now()}-${i}-${file.name}`,
-          name: file.name,
-          type: uploaded.contentType || file.type || 'application/octet-stream',
-          size: uploaded.size ?? file.size,
-          url: uploaded.url,
-          key: uploaded.key
-        });
-      } catch (error) {
-        this.infoMessage = `No se pudo subir "${file.name}": ${error}`;
-      }
-    }
-
-    input.value = '';
-    this.applySelectedNodeMetadata();
-  }
-
-  public removeAttachment(index: number): void {
-    this.selectedTaskAttachments.splice(index, 1);
-    this.applySelectedNodeMetadata();
   }
 
   public onSelectedLinkConditionChange(update: LinkConditionUpdate): void {
@@ -1196,6 +1175,9 @@ private showLinkTools(linkView: dia.LinkView): void {
     if (!payloadCell || typeof payloadCell !== 'object') {
       return;
     }
+    if (this.isLaneSnapshot(payloadCell as Record<string, unknown>)) {
+      return;
+    }
 
     if (this.graph.getCell(event.cellId)) {
       return;
@@ -1214,6 +1196,9 @@ private showLinkTools(linkView: dia.LinkView): void {
     if (!cell) {
       return;
     }
+    if (this.isLaneCell(cell)) {
+      return;
+    }
 
     this.isRemoteChange = true;
     try {
@@ -1228,6 +1213,9 @@ private showLinkTools(linkView: dia.LinkView): void {
     const cellSnapshot = event.payload?.['cell'];
 
     if (!cell || !cellSnapshot || typeof cellSnapshot !== 'object') {
+      return;
+    }
+    if (this.isLaneCell(cell) || this.isLaneSnapshot(cellSnapshot as Record<string, unknown>)) {
       return;
     }
 
@@ -1335,8 +1323,14 @@ private showLinkTools(linkView: dia.LinkView): void {
       this.selectedTargetId = null;
       this.isConnectionMode = false;
       const normalizedLanes = this.normalizeLanesFromAreas(policy.lanes ?? []);
-      this.lanes = this.diagramCanvasService.recalculateLanePositions(normalizedLanes);
+      const hasGeometry = this.hasPersistedLaneGeometry(normalizedLanes);
+      this.lanes = hasGeometry
+        ? [...normalizedLanes]
+        : this.diagramCanvasService.recalculateLanePositions(normalizedLanes);
       this.diagramCanvasService.renderPolicy(this.graph, policy, this.lanes);
+      if (!hasGeometry) {
+        this.syncLanesFromCanvas(false);
+      }
       this.diagramStorageService.clear();
     } finally {
       this.isApplyingPolicySnapshot = false;
@@ -1362,6 +1356,11 @@ private showLinkTools(linkView: dia.LinkView): void {
     this.webSocketService.sendMessage(this.selectedPolicyId, event);
   }
 
+  private broadcastLaneLayoutSync(): void {
+    const persistedDiagram = this.diagramCanvasService.getPersistedGraphJSON(this.graph);
+    this.broadcastFullSync(persistedDiagram as Record<string, unknown>, this.lanes);
+  }
+
   private normalizeLanesFromAreas(sourceLanes: Lane[]): Lane[] {
     if (this.availableAreas.length === 0) {
       return sourceLanes;
@@ -1379,10 +1378,88 @@ private showLinkTools(linkView: dia.LinkView): void {
           id: matchedArea.name,
           name: matchedArea.name,
           color: matchedArea.color,
-          x: lane.x ?? 0
+          x: lane.x ?? 0,
+          width: lane.width
         } as Lane;
       })
       .filter((lane): lane is Lane => lane !== null);
+  }
+
+  private hasPersistedLaneGeometry(lanes: Lane[]): boolean {
+    return lanes.length > 0 && lanes.every((lane) =>
+      Number.isFinite(lane.x) &&
+      (lane.x ?? 0) > 0 &&
+      Number.isFinite(lane.width) &&
+      (lane.width ?? 0) > 0
+    );
+  }
+
+  private isLaneCell(cell: dia.Cell): boolean {
+    return !!cell && !!cell.get('isLaneBackground');
+  }
+
+  private isLaneSnapshot(snapshot: Record<string, unknown>): boolean {
+    return Boolean(snapshot['isLaneBackground']);
+  }
+
+  private syncLanesFromCanvas(shouldBroadcast = true): void {
+    const laneShapes = this.graph.getElements()
+      .filter((element) => this.isLaneCell(element))
+      .sort((a, b) => a.position().x - b.position().x);
+
+    if (laneShapes.length === 0 || this.lanes.length === 0) {
+      return;
+    }
+
+    const lanesById = new Map(this.lanes.map((lane) => [lane.id, lane]));
+    const updatedLanes: Lane[] = [];
+
+    for (const laneShape of laneShapes) {
+      const laneId = String((laneShape as any).laneId ?? laneShape.get('laneId') ?? '');
+      const lane = lanesById.get(laneId);
+      if (!lane) {
+        continue;
+      }
+      const size = laneShape.size();
+      const position = laneShape.position();
+      updatedLanes.push({
+        ...lane,
+        x: Number((position.x + size.width / 2).toFixed(2)),
+        width: Number(Math.max(120, size.width).toFixed(2))
+      });
+    }
+
+    if (updatedLanes.length !== this.lanes.length) {
+      return;
+    }
+
+    this.lanes = updatedLanes;
+    this.scheduleLocalSave();
+    if (!this.isRemoteChange && !this.suppressAutoSave) {
+      this.scheduleAutoSave();
+    }
+
+    if (!shouldBroadcast || !this.selectedPolicyId || this.isRemoteChange) {
+      return;
+    }
+
+    if (this.laneGeometrySyncTimeout) {
+      clearTimeout(this.laneGeometrySyncTimeout);
+    }
+    this.laneGeometrySyncTimeout = setTimeout(() => {
+      this.laneGeometrySyncTimeout = null;
+      this.broadcastLaneLayoutSync();
+    }, 250);
+  }
+
+  private scheduleLaneGeometryCapture(): void {
+    if (this.laneGeometryCaptureTimeout) {
+      clearTimeout(this.laneGeometryCaptureTimeout);
+    }
+    this.laneGeometryCaptureTimeout = setTimeout(() => {
+      this.laneGeometryCaptureTimeout = null;
+      this.syncLanesFromCanvas();
+    }, 60);
   }
 
   private scheduleLocalSave(): void {
@@ -1494,6 +1571,7 @@ private showLinkTools(linkView: dia.LinkView): void {
         }
       ];
       if (this.isMutationIntent(text)) {
+        this.applyLaneCommandsFromText(text);
         const apply = await this.copilotService.applyChange(
           text,
           currentDiagram,
@@ -1584,6 +1662,44 @@ private showLinkTools(linkView: dia.LinkView): void {
     return /(agrega|añade|anade|crea|modifica|cambia|elimina|borra|conecta|desconecta|mueve|renombra|actualiza)/.test(normalized);
   }
 
+  private applyLaneCommandsFromText(text: string): void {
+    const normalizedText = (text ?? '').toLowerCase();
+    if (!normalizedText) {
+      return;
+    }
+
+    const areasByName = new Map(
+      this.availableAreas.map((area) => [area.name.toLowerCase(), area])
+    );
+
+    let changed = false;
+    for (const [areaName, area] of areasByName.entries()) {
+      const escapedAreaName = this.escapeRegExp(areaName);
+      const addPattern = new RegExp(`(agrega|a(?:ñ|n)ade|crea)\\s+(el\\s+|un\\s+)?carril\\s+(${escapedAreaName})`, 'i');
+      const removePattern = new RegExp(`(elimina|borra|quita|remueve)\\s+(el\\s+|un\\s+)?carril\\s+(${escapedAreaName})`, 'i');
+
+      if (addPattern.test(normalizedText) && !this.lanes.some((lane) => lane.id === area.name)) {
+        this.lanes = this.diagramCanvasService.recalculateLanePositions([
+          ...this.lanes,
+          { id: area.name, name: area.name, color: area.color, x: 0 }
+        ]);
+        changed = true;
+      }
+
+      if (removePattern.test(normalizedText) && this.lanes.some((lane) => lane.id === area.name)) {
+        this.lanes = this.diagramCanvasService.recalculateLanePositions(
+          this.lanes.filter((lane) => lane.id !== area.name)
+        );
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      this.diagramCanvasService.renderLaneBackgrounds(this.graph, this.lanes);
+      this.broadcastLaneLayoutSync();
+    }
+  }
+
   private resolveCopilotDiagram(
     instruction: string,
     currentDiagram: dia.Graph.JSON,
@@ -1644,6 +1760,10 @@ private showLinkTools(linkView: dia.LinkView): void {
   private isDestructiveIntent(text: string): boolean {
     const normalized = (text ?? '').toLowerCase();
     return /(elimina|borra|quita|remueve|desconecta|limpia)/.test(normalized);
+  }
+
+  private escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 }
 

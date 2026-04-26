@@ -254,10 +254,31 @@ public class PolicyService {
         if (lanes == null || lanes.isEmpty()) {
             return "default";
         }
-        double laneWidth = 1200.0 / lanes.size();
         double nodeCenterX = xPosition + 70.0;
-        int laneIndex = Math.max(0, Math.min(lanes.size() - 1, (int) (nodeCenterX / laneWidth)));
-        return lanes.get(laneIndex).getId();
+
+        boolean hasPersistedWidth = lanes.stream()
+                .allMatch(lane -> lane.getX() != null && lane.getWidth() != null && lane.getWidth() > 0);
+
+        if (!hasPersistedWidth) {
+            double laneWidth = 1200.0 / lanes.size();
+            int laneIndex = Math.max(0, Math.min(lanes.size() - 1, (int) (nodeCenterX / laneWidth)));
+            return lanes.get(laneIndex).getId();
+        }
+
+        List<Lane> ordered = new ArrayList<>(lanes);
+        ordered.sort(Comparator.comparingDouble(lane -> lane.getX() == null ? 0.0 : lane.getX()));
+
+        for (Lane lane : ordered) {
+            double centerX = lane.getX() == null ? 0.0 : lane.getX();
+            double width = lane.getWidth() == null ? 0.0 : lane.getWidth();
+            double left = centerX - width / 2.0;
+            double right = centerX + width / 2.0;
+            if (nodeCenterX >= left && nodeCenterX <= right) {
+                return lane.getId();
+            }
+        }
+
+        return ordered.get(ordered.size() - 1).getId();
     }
 
     private boolean isWorkflowNode(JsonNode node) {

@@ -162,16 +162,6 @@
               <button type="button" class="add-field-btn action-positive" (click)="addTaskField()">Agregar pregunta</button>
             </div>
           </div>
-
-          <label>Adjuntos del formulario</label>
-          <input type="file" multiple (change)="onTaskAttachmentChange($event)" />
-          <ul class="attachment-list">
-            <li *ngFor="let attachment of selectedTaskAttachments; index as i">
-              {{ attachment.name }} ({{ attachment.type || 'archivo' }})
-              <a *ngIf="attachment.url" [href]="attachment.url" target="_blank" rel="noopener noreferrer">Ver</a>
-              <button type="button" class="small-btn action-outline" (click)="removeAttachment(i)">Eliminar</button>
-            </li>
-          </ul>
         </div>
 
         <div *ngIf="selectedNodeType === 'DECISION'" class="decision-config">
@@ -245,11 +235,25 @@
     (dragleave)="onCanvasDragLeave()"
     (drop)="onCanvasDrop($event)"></main>
 
-  <app-copilot-chat
-    class="panel-right"
-    [messages]="copilotMessages"
-    [loading]="copilotLoading"
-    (messageSubmitted)="onCopilotMessageSubmitted($event)"
-    (analyzeRequested)="onCopilotAnalyzeRequested()">
-  </app-copilot-chat>
+  <button
+    type="button"
+    class="copilot-fab"
+    [class.open]="isCopilotOpen"
+    (click)="toggleCopilotChat()">
+    {{ isCopilotOpen ? 'Cerrar Asistente' : 'Asistente BPMN' }}
+  </button>
+
+  <section class="copilot-floating" *ngIf="isCopilotOpen">
+    <div class="copilot-floating-header">
+      <strong>Asistente BPMN</strong>
+      <button type="button" class="copilot-close-btn" (click)="closeCopilotChat()">x</button>
+    </div>
+    <app-copilot-chat
+      class="copilot-floating-chat"
+      [messages]="copilotMessages"
+      [loading]="copilotLoading"
+      (messageSubmitted)="onCopilotMessageSubmitted($event)"
+      (analyzeRequested)="onCopilotAnalyzeRequested()">
+    </app-copilot-chat>
+  </section>
 </div>
