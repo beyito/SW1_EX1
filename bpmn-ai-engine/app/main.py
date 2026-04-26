@@ -43,6 +43,7 @@ class CopilotRequest(BaseModel):
     userMessage: str = Field(..., min_length=1)
     currentDiagram: Dict[str, Any] = Field(default_factory=dict)
     models: List[str] = Field(default_factory=list)
+    history: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class CopilotResponse(BaseModel):
@@ -124,6 +125,7 @@ def copilot_chat(payload: CopilotRequest, http_request: Request) -> CopilotRespo
     user_payload = {
         "user_message": payload.userMessage,
         "current_diagram": payload.currentDiagram,
+        "conversation_history": payload.history,
     }
 
     try:

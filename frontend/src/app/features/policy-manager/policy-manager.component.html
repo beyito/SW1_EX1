@@ -1,35 +1,41 @@
 <section class="manager-shell">
   <header class="manager-header">
     <div>
-      <h2>Politicas de Negocio</h2>
-      <p>Administra politicas y abre el editor de diagramas por identificador.</p>
+      <h2>Lista de Tramites</h2>
+      <p>Gestiona politicas activas y accede al disenador con una experiencia unificada.</p>
     </div>
   </header>
 
-  <div class="card">
-    <h3>Nueva Politica</h3>
-    <label>Nombre</label>
-    <input
-      type="text"
-      [(ngModel)]="newPolicyName"
-      placeholder="Politica de aprobacion"
-    />
+  <section class="card card-create">
+    <h3>Crear nuevo tramite</h3>
+    <div class="form-grid">
+      <label>
+        Nombre
+        <input
+          type="text"
+          [(ngModel)]="newPolicyName"
+          placeholder="Politica de aprobacion"
+        />
+      </label>
 
-    <label>Descripcion</label>
-    <textarea
-      rows="3"
-      [(ngModel)]="newPolicyDescription"
-      placeholder="Describe el objetivo de esta politica"></textarea>
+      <label>
+        Descripcion
+        <textarea
+          rows="3"
+          [(ngModel)]="newPolicyDescription"
+          placeholder="Describe el objetivo de esta politica"></textarea>
+      </label>
+    </div>
 
-    <button type="button" (click)="createPolicy()" [disabled]="creating">
-      {{ creating ? 'Creando...' : 'Nueva Politica' }}
+    <button type="button" class="btn-primary" (click)="createPolicy()" [disabled]="creating">
+      {{ creating ? 'Creando...' : 'Crear tramite' }}
     </button>
-  </div>
+  </section>
 
-  <div class="card">
+  <section class="card card-list">
     <div class="card-title-row">
-      <h3>Politicas Registradas</h3>
-      <button type="button" class="btn-secondary" (click)="loadPolicies()" [disabled]="loading">
+      <h3>Politicas registradas</h3>
+      <button type="button" class="btn-outline" (click)="loadPolicies()" [disabled]="loading">
         Recargar
       </button>
     </div>
@@ -40,7 +46,7 @@
       @if (policies.length === 0) {
         <p class="muted">No hay politicas disponibles.</p>
       } @else {
-        <table>
+        <table class="enterprise-table">
           <thead>
             <tr>
               <th>Nombre</th>
@@ -54,9 +60,9 @@
                 <td>{{ policy.name }}</td>
                 <td>{{ policy.description || 'Sin descripcion' }}</td>
                 <td class="actions-cell">
-                  <button type="button" (click)="editDiagram(policy.id)">Editar Diagrama</button>
-                  <button type="button" class="btn-secondary metrics-btn" (click)="viewMetrics(policy.id)">
-                    <span class="metrics-icon" aria-hidden="true"></span>
+                  <button type="button" class="btn-outline" (click)="editDiagram(policy.id)">Editar diagrama</button>
+                  <button type="button" class="btn-outline metrics-btn" (click)="viewMetrics(policy.id)">
+                    <span class="metrics-icon" aria-hidden="true">▮▮▮</span>
                     Ver Metricas
                   </button>
                 </td>
@@ -70,5 +76,5 @@
     @if (message) {
       <p class="message">{{ message }}</p>
     }
-  </div>
+  </section>
 </section>

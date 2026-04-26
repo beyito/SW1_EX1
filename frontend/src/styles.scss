@@ -1,8 +1,67 @@
 /* You can add global styles to this file, and also import other style files */
 @import "@joint/plus/joint-plus.css";
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
+:root {
+  --color-primary: #1e3a8a;
+  --color-primary-strong: #172d68;
+  --color-positive: #10b981;
+  --color-positive-strong: #0b9467;
+  --color-text-main: #374151;
+  --color-text-muted: #6b7280;
+  --color-bg-app: #eef2f7;
+  --color-bg-panel: #f3f4f6;
+  --color-bg-surface: #ffffff;
+  --color-bg-canvas: #f9fafb;
+  --color-border: #d1d5db;
+  --shadow-sm: 0 6px 16px rgba(30, 58, 138, 0.08);
+  --shadow-md: 0 14px 34px rgba(15, 23, 42, 0.12);
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+}
 
 body {
-  height: 100vh;
+  min-height: 100vh;
   box-sizing: border-box;
   margin: 0;
+  font-family: "Inter", "Poppins", "Segoe UI", sans-serif;
+  color: var(--color-text-main);
+  background: var(--color-bg-app);
+  text-rendering: optimizeLegibility;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  transition: all 0.2s ease;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid rgba(30, 58, 138, 0.45);
+  outline-offset: 1px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  text-align: left;
 }

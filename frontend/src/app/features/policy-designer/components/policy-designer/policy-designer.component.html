@@ -1,111 +1,122 @@
 <div class="app-shell">
   <aside class="panel">
     <button class="btn-nav-back" type="button" (click)="goBackToPanel()">
-      ← Volver al Panel
+      Volver a Panel
     </button>
-    <h1>Disenador de diagramas</h1>
-    <p class="section-hint">Politica actual: {{ policyName || selectedPolicyId || 'Sin nombre' }}</p>
-    <p class="section-hint">ID: {{ selectedPolicyId || 'Sin id' }}</p>
 
-    <div class="button-row">
-      <button type="button" (click)="getTaskExecutionOrder()" [disabled]="!selectedPolicyId">Ver orden</button>
-    </div>
+    <header class="designer-header">
+      <h1>Disenador BPMN</h1>
+      <p class="section-hint">Politica: {{ policyName || selectedPolicyId || 'Sin nombre' }}</p>
+      <p class="section-hint">ID: {{ selectedPolicyId || 'Sin id' }}</p>
+    </header>
 
     <section class="block">
-      <p class="section-title">Calles de negocio</p>
+      <p class="section-title">GESTOR DE CARRILES</p>
       <div class="lane-input">
         <select [(ngModel)]="selectedAreaId">
-          <option value="">-- Seleccionar area --</option>
+          <option value="">Seleccionar area</option>
           <option *ngFor="let area of availableAreas" [value]="area.id">{{ area.name }}</option>
         </select>
-        <button type="button" (click)="addLane()" class="add-btn" [disabled]="!selectedAreaId">+</button>
+        <button type="button" class="add-btn" (click)="addLane()" [disabled]="!selectedAreaId">Agregar</button>
       </div>
-      <div class="lanes-list" *ngIf="lanes.length > 0">
-        <div class="lane-item" *ngFor="let lane of lanes" [style.borderLeft]="'4px solid ' + lane.color">
-          <span>{{ lane.name }}</span>
-          <button class="remove-btn" (click)="removeLane(lane.id)">x</button>
-        </div>
+
+      <div class="lane-cards" *ngIf="lanes.length > 0">
+        <article class="lane-card" *ngFor="let lane of lanes" [style.borderLeft]="'4px solid ' + lane.color">
+          <div class="lane-main">
+            <span class="lane-icon">A</span>
+            <div class="lane-content">
+              <strong>{{ lane.name }}</strong>
+              <small>Area participante</small>
+            </div>
+          </div>
+          <div class="lane-actions">
+            <button class="lane-action-btn" title="Configuracion" type="button">⚙</button>
+            <button class="lane-action-btn danger" type="button" (click)="removeLane(lane.id)" title="Quitar carril">
+              x
+            </button>
+          </div>
+        </article>
       </div>
-      <p *ngIf="lanes.length === 0" class="empty-text">Sin calles definidas</p>
+      <p *ngIf="lanes.length === 0" class="empty-text">Aun no hay carriles definidos.</p>
     </section>
 
     <section class="block">
-      <p class="section-title">Agregar elementos</p>
-      <p class="section-hint">Arrastra desde aqui al lienzo</p>
+      <p class="section-title">ELEMENTOS</p>
+      <p class="section-hint">Arrastra elementos al lienzo para construir el flujo.</p>
       <div class="tool-buttons">
         <button
           type="button"
+          class="node-btn"
           draggable="true"
           *ngFor="let node of nodeTemplates"
+          [attr.data-node-type]="node.type"
           (dragstart)="startDraggingNode(node.type, node.label, $event)">
-          {{ node.label }}
+          <span class="node-icon">{{ node.label.charAt(0) }}</span>
+          <span>{{ node.label }}</span>
         </button>
       </div>
-      <button type="button" class="wide-button" (click)="connectSelected()">
-        {{ isConnectionMode ? 'Salir de conexion' : 'Crear conexion' }}
-      </button>
-      <button type="button" class="wide-button" (click)="clearSelection()">Borrar seleccion</button>
+
+      <div class="action-grid">
+        <button type="button" class="wide-button action-positive" (click)="connectSelected()">
+          {{ isConnectionMode ? 'Salir de conexion' : 'Crear conexion' }}
+        </button>
+        <button type="button" class="wide-button action-outline" (click)="clearSelection()">Borrar seleccion</button>
+        <button type="button" class="wide-button action-outline" (click)="getTaskExecutionOrder()" [disabled]="!selectedPolicyId">
+          Ver orden de tareas
+        </button>
+      </div>
     </section>
 
     <section class="block" *ngIf="selectedElementType">
-      <p class="section-title">Editar elemento</p>
+      <p class="section-title">PROPIEDADES</p>
       <p class="section-hint">Elemento seleccionado: {{ selectedElementType === 'node' ? 'Nodo' : 'Flecha' }}</p>
-      
-      <!-- Renombrar nodo -->
+
       <div *ngIf="selectedElementType === 'node'">
         <div *ngIf="!isRenaming">
-          <button type="button" class="wide-button" (click)="startRenaming()">Renombrar nodo</button>
+          <button type="button" class="wide-button action-outline" (click)="startRenaming()">Renombrar nodo</button>
         </div>
         <div *ngIf="isRenaming" class="rename-form">
-          <input 
-            type="text" 
-            [(ngModel)]="newElementName" 
-            placeholder="Nuevo nombre del nodo"
-            [autofocus]="isRenaming" />
+          <input type="text" [(ngModel)]="newElementName" placeholder="Nuevo nombre del nodo" [autofocus]="isRenaming" />
           <div class="button-row">
-            <button type="button" (click)="confirmRename()">Confirmar</button>
-            <button type="button" (click)="cancelRename()">Cancelar</button>
+            <button type="button" class="action-positive" (click)="confirmRename()">Confirmar</button>
+            <button type="button" class="action-outline" (click)="cancelRename()">Cancelar</button>
           </div>
         </div>
 
         <div *ngIf="selectedNodeType === 'TASK'" class="task-config">
-          <p class="section-title">Formulario de verificación</p>
+          <p class="section-subtitle">Formulario de verificacion</p>
 
-          <!-- Título del formulario -->
-          <label>Título del formulario</label>
+          <label>Titulo del formulario</label>
           <input
             type="text"
             [(ngModel)]="selectedTaskFormTitle"
             (ngModelChange)="applySelectedNodeMetadata()"
-            placeholder="Ej: Verificación de instalación"
+            placeholder="Ej: Verificacion de instalacion"
           />
 
-          <!-- Descripción del formulario -->
-          <label>Descripción del formulario</label>
+          <label>Descripcion del formulario</label>
           <textarea
             [(ngModel)]="selectedTaskFormDescription"
             (ngModelChange)="applySelectedNodeMetadata()"
-            placeholder="Describe qué debe verificarse cuando se complete esta tarea"
+            placeholder="Describe que debe verificarse en esta tarea"
             rows="3"></textarea>
 
-          <!-- Diseñador de formulario -->
           <div class="form-designer">
             <div class="form-designer-header">
               <h4>Preguntas del formulario</h4>
-              <button type="button" class="toggle-btn" (click)="toggleFormDesigner()">
-                {{ isFormDesignerOpen ? 'Ocultar diseñador' : 'Mostrar diseñador' }}
+              <button type="button" class="toggle-btn action-outline" (click)="toggleFormDesigner()">
+                {{ isFormDesignerOpen ? 'Ocultar' : 'Mostrar' }}
               </button>
             </div>
 
-            <!-- Lista de campos existentes -->
             <div class="fields-list" *ngIf="selectedTaskFormFields.length > 0">
               <div class="field-item" *ngFor="let field of selectedTaskFormFields; index as i; trackBy: trackByFieldId">
                 <div class="field-header">
                   <span class="field-type">{{ getFieldTypeLabel(field.type) }}</span>
                   <span class="field-label">{{ field.label }}</span>
                   <div class="field-actions">
-                    <button type="button" class="small-btn edit-btn" (click)="editField(i)">Editar</button>
-                    <button type="button" class="small-btn delete-btn" (click)="removeTaskField(i)">×</button>
+                    <button type="button" class="small-btn action-outline" (click)="editField(i)">Editar</button>
+                    <button type="button" class="small-btn danger-btn" (click)="removeTaskField(i)">x</button>
                   </div>
                 </div>
                 <div class="field-details" *ngIf="field.required || field.requiresAttachment">
@@ -115,35 +126,25 @@
               </div>
             </div>
 
-            <!-- Formulario para agregar nuevo campo -->
             <div class="new-field-form" *ngIf="isFormDesignerOpen">
-              <h5>Agregar nueva pregunta</h5>
-
+              <h5>Agregar pregunta</h5>
               <label>Tipo de pregunta</label>
               <select [(ngModel)]="newFieldType">
                 <option value="text">Texto corto</option>
                 <option value="textarea">Texto largo</option>
-                <option value="number">Número</option>
+                <option value="number">Numero</option>
                 <option value="date">Fecha</option>
-                <option value="select">Selección única</option>
-                <option value="checkbox">Selección múltiple</option>
+                <option value="select">Seleccion unica</option>
+                <option value="checkbox">Seleccion multiple</option>
                 <option value="file">Archivo</option>
               </select>
 
               <label>Pregunta</label>
-              <input
-                type="text"
-                [(ngModel)]="newFieldLabel"
-                placeholder="¿Cuál es el resultado de la tarea?"
-              />
+              <input type="text" [(ngModel)]="newFieldLabel" placeholder="Cual es el resultado de la tarea?" />
 
               <div *ngIf="newFieldType === 'select' || newFieldType === 'checkbox'">
                 <label>Opciones (separadas por coma)</label>
-                <input
-                  type="text"
-                  [(ngModel)]="newFieldOptions"
-                  placeholder="Opción 1, Opción 2, Opción 3"
-                />
+                <input type="text" [(ngModel)]="newFieldOptions" placeholder="Opcion 1, Opcion 2, Opcion 3" />
               </div>
 
               <div class="field-options">
@@ -153,56 +154,37 @@
                 </label>
 
                 <div *ngIf="newFieldRequiresAttachment">
-                  <label>Etiqueta para el adjunto</label>
-                  <input
-                    type="text"
-                    [(ngModel)]="newFieldAttachmentLabel"
-                    placeholder="Ej: Foto del resultado"
-                  />
+                  <label>Etiqueta para adjunto</label>
+                  <input type="text" [(ngModel)]="newFieldAttachmentLabel" placeholder="Ej: Foto del resultado" />
                 </div>
               </div>
 
-              <button type="button" class="add-field-btn" (click)="addTaskField()">Agregar pregunta</button>
+              <button type="button" class="add-field-btn action-positive" (click)="addTaskField()">Agregar pregunta</button>
             </div>
           </div>
 
-          <!-- Adjuntos generales del formulario -->
           <label>Adjuntos del formulario</label>
           <input type="file" multiple (change)="onTaskAttachmentChange($event)" />
           <ul class="attachment-list">
             <li *ngFor="let attachment of selectedTaskAttachments; index as i">
               {{ attachment.name }} ({{ attachment.type || 'archivo' }})
               <a *ngIf="attachment.url" [href]="attachment.url" target="_blank" rel="noopener noreferrer">Ver</a>
-              <button type="button" class="small-btn" (click)="removeAttachment(i)">Eliminar</button>
+              <button type="button" class="small-btn action-outline" (click)="removeAttachment(i)">Eliminar</button>
             </li>
           </ul>
         </div>
 
         <div *ngIf="selectedNodeType === 'DECISION'" class="decision-config">
-          <p class="section-title">Condicional</p>
-          <label>Expresión de condición</label>
+          <p class="section-subtitle">Condicional</p>
+          <label>Expresion de condicion</label>
           <input
             type="text"
             [(ngModel)]="selectedDecisionExpression"
             (ngModelChange)="applySelectedNodeMetadata()"
             placeholder="Ej: monto > 1000"
           />
-          <p class="section-hint">
-            Crea dos flechas salientes desde este nodo. Una flecha se etiqueta como "Sí" y la otra como "No".
-          </p>
+          <p class="section-hint">Recomendacion: define dos salidas de decision claramente etiquetadas.</p>
         </div>
-      </div>
-
-      <!-- Para links, mostrar mensaje -->
-      <div *ngIf="false">
-        <p class="section-title">Etiqueta de flecha</p>
-        <label>Condición / texto de ruta</label>
-        <input
-          type="text"
-          [(ngModel)]="selectedLinkConditionLabel"
-          placeholder="Sí / No / Otro texto"
-        />
-        <button type="button" class="wide-button"></button>
       </div>
 
       <div *ngIf="selectedElementType === 'link'">
@@ -215,24 +197,23 @@
         </app-link-properties-panel>
       </div>
 
-      <!-- Eliminar elemento -->
       <button type="button" class="wide-button delete-btn" (click)="deleteElement()">Eliminar elemento (Supr)</button>
     </section>
 
     <section class="block info-box">
+      <p class="section-title">ESTADO</p>
       <p class="info-text">{{ infoMessage }}</p>
       <p class="info-detail"><strong>Origen:</strong> {{ selectedSourceId ?? 'ninguno' }}</p>
       <p class="info-detail"><strong>Destino:</strong> {{ selectedTargetId ?? 'ninguno' }}</p>
-      <p class="info-detail"><strong>Modo conexion:</strong> {{ isConnectionMode ? 'activo' : 'inactivo' }}</p>
+      <p class="info-detail"><strong>Conexion:</strong> {{ isConnectionMode ? 'activa' : 'inactiva' }}</p>
     </section>
 
-    <!-- Orden de tareas -->
     <section class="block" *ngIf="showTaskOrder && taskExecutionOrder">
       <div class="task-order-header">
-        <h3>Orden de Ejecución de Tareas</h3>
-        <button type="button" class="close-btn" (click)="hideTaskOrder()">×</button>
+        <h3>Orden de ejecucion de tareas</h3>
+        <button type="button" class="close-btn" (click)="hideTaskOrder()">x</button>
       </div>
-      <p class="policy-name"><strong>Política:</strong> {{ taskExecutionOrder.policyName }}</p>
+      <p class="policy-name"><strong>Politica:</strong> {{ taskExecutionOrder.policyName }}</p>
 
       <div class="task-list">
         <div class="task-item" *ngFor="let task of taskExecutionOrder.tasks; trackBy: trackByTaskId">
@@ -271,5 +252,3 @@
     (analyzeRequested)="onCopilotAnalyzeRequested()">
   </app-copilot-chat>
 </div>
-
-

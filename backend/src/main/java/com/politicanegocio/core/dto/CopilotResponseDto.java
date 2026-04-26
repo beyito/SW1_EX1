@@ -6,6 +6,7 @@ import java.util.List;
 
 public record CopilotResponseDto(
         String message,
-        @JsonAlias("suggested_actions") List<String> suggestedActions
+        @JsonAlias("suggested_actions") List<String> suggestedActions,
+        String conversationId
 ) {
 }

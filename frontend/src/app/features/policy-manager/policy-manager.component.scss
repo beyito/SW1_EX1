@@ -4,70 +4,89 @@
 
 .manager-shell {
   display: grid;
-  gap: 16px;
+  gap: 14px;
 }
 
 .manager-header h2 {
   margin: 0;
-  color: #0f172a;
+  color: var(--color-primary);
+  font-size: 1.35rem;
 }
 
 .manager-header p {
   margin: 6px 0 0;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .card {
-  background: #fff;
-  border: 1px solid #dbe3ef;
-  border-radius: 14px;
-  padding: 18px;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
 }
 
 .card h3 {
-  margin-top: 0;
+  margin: 0 0 12px;
+  color: var(--color-text-main);
+}
+
+.form-grid {
+  display: grid;
+  gap: 10px;
   margin-bottom: 12px;
 }
 
 label {
-  display: block;
-  font-size: 0.9rem;
+  display: grid;
+  gap: 5px;
+  color: var(--color-text-main);
+  font-size: 0.85rem;
   font-weight: 600;
-  color: #334155;
-  margin-bottom: 6px;
 }
 
 input,
 textarea {
   width: 100%;
-  border: 1px solid #cbd5e1;
-  border-radius: 10px;
-  padding: 10px 12px;
-  font: inherit;
-  margin-bottom: 12px;
-  box-sizing: border-box;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 9px 10px;
+  color: var(--color-text-main);
+  background: #fff;
 }
 
-button {
-  border: 1px solid #2563eb;
-  background: #2563eb;
-  color: #fff;
-  border-radius: 10px;
-  padding: 9px 14px;
+.btn-primary,
+.btn-outline {
+  border-radius: var(--radius-md);
   font-weight: 600;
+  padding: 8px 12px;
   cursor: pointer;
 }
 
-button:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
+.btn-primary {
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary);
+  color: #ffffff;
 }
 
-.btn-secondary {
-  background: #eef2ff;
-  border-color: #c7d2fe;
-  color: #1e3a8a;
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-strong);
+}
+
+.btn-outline {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: var(--color-primary);
+}
+
+.btn-outline:hover:not(:disabled) {
+  background: #eff6ff;
+}
+
+.btn-primary:disabled,
+.btn-outline:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .card-title-row {
@@ -91,80 +110,65 @@ button:disabled {
 }
 
 .metrics-icon {
-  width: 14px;
-  height: 14px;
-  position: relative;
-  display: inline-block;
-  border-bottom: 2px solid currentColor;
-
-  &::before,
-  &::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    width: 3px;
-    background: currentColor;
-    border-radius: 2px 2px 0 0;
-  }
-
-  &::before {
-    left: 3px;
-    height: 8px;
-  }
-
-  &::after {
-    left: 8px;
-    height: 11px;
-  }
+  letter-spacing: 1px;
+  font-size: 0.65rem;
+  color: var(--color-positive);
 }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
+.enterprise-table {
+  border-radius: 10px;
+  overflow: hidden;
 }
 
-th,
-td {
-  text-align: left;
+.enterprise-table thead {
+  background: #f8fafc;
+}
+
+.enterprise-table th,
+.enterprise-table td {
   padding: 10px;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.enterprise-table tbody tr:hover {
+  background: #f8fafc;
 }
 
 .muted {
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .message {
   margin-top: 12px;
-  color: #0369a1;
-  background: #e0f2fe;
-  border: 1px solid #bae6fd;
+  color: #065f46;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
   border-radius: 8px;
   padding: 8px 10px;
 }
 
 @media (max-width: 840px) {
-  table,
-  thead,
-  tbody,
-  tr,
-  th,
-  td {
+  .enterprise-table,
+  .enterprise-table thead,
+  .enterprise-table tbody,
+  .enterprise-table tr,
+  .enterprise-table th,
+  .enterprise-table td {
     display: block;
   }
 
-  thead {
+  .enterprise-table thead {
     display: none;
   }
 
-  tr {
-    border: 1px solid #e2e8f0;
+  .enterprise-table tr {
+    border: 1px solid #e5e7eb;
     border-radius: 10px;
     margin-bottom: 10px;
     padding: 8px;
   }
 
-  td {
+  .enterprise-table td {
     border-bottom: none;
     padding: 6px 0;
   }

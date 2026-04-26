@@ -47,6 +47,7 @@ export class PolicyDesignerComponent implements OnInit, AfterViewInit, OnDestroy
   private autoSaveInFlight = false;
   private pendingAutoSave = false;
   private suppressAutoSave = false;
+  private isApplyingPolicySnapshot = false;
   private draggingNodeType: string | null = null;
   private policySubscription: StompSubscription | null = null;
   private cellSyncTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
@@ -90,6 +91,7 @@ export class PolicyDesignerComponent implements OnInit, AfterViewInit, OnDestroy
   public showTaskOrder = false;
   public copilotLoading = false;
   public copilotMessages: CopilotChatMessage[] = [];
+  public copilotConversationId: string | null = null;
 
   public ngOnInit(): void {
     this.registerPaperEvents();
@@ -176,7 +178,7 @@ private showLinkTools(linkView: dia.LinkView): void {
           selector: 'arrowhead', // Nombre estricto interno
           attributes: {
             'd': circlePath,
-            'fill': '#38bdf8',       // Azul claro
+            'fill': '#1E3A8A',
             'stroke': '#ffffff',     // Borde blanco
             'stroke-width': 2,
             'cursor': 'pointer'
@@ -193,7 +195,7 @@ private showLinkTools(linkView: dia.LinkView): void {
           selector: 'arrowhead',
           attributes: {
             'd': circlePath,
-            'fill': '#38bdf8',
+            'fill': '#1E3A8A',
             'stroke': '#ffffff',
             'stroke-width': 2,
             'cursor': 'pointer'
@@ -322,7 +324,7 @@ private showLinkTools(linkView: dia.LinkView): void {
       }
     });
     this.graph.on('add', (cell: dia.Cell) => {
-      if (this.isRemoteChange || !this.selectedPolicyId) {
+      if (this.isRemoteChange || this.isApplyingPolicySnapshot || !this.selectedPolicyId) {
         return;
       }
 
@@ -339,7 +341,7 @@ private showLinkTools(linkView: dia.LinkView): void {
     });
 
     this.graph.on('remove', (cell: dia.Cell) => {
-      if (this.isRemoteChange || !this.selectedPolicyId) {
+      if (this.isRemoteChange || this.isApplyingPolicySnapshot || !this.selectedPolicyId) {
         return;
       }
 
@@ -355,7 +357,7 @@ private showLinkTools(linkView: dia.LinkView): void {
     });
 
     this.graph.on('change:position', (cell: dia.Cell) => {
-      if (this.isRemoteChange || !this.selectedPolicyId || !cell.isElement()) {
+      if (this.isRemoteChange || this.isApplyingPolicySnapshot || !this.selectedPolicyId || !cell.isElement()) {
         return;
       }
 
@@ -936,6 +938,7 @@ private showLinkTools(linkView: dia.LinkView): void {
 
       this.policyName = policy.name;
       this.applyPolicy(policy);
+      await this.loadCopilotHistory(policyId);
       await this.connectToPolicyTopic(policyId);
       this.infoMessage = `Editando politica: ${policy.name}`;
       this.cdr.detectChanges();
@@ -946,7 +949,7 @@ private showLinkTools(linkView: dia.LinkView): void {
   }
 
   private scheduleCellRealtimeSync(cell: dia.Cell, delayMs = 140): void {
-    if (this.isRemoteChange || !this.selectedPolicyId) {
+    if (this.isRemoteChange || this.isApplyingPolicySnapshot || !this.selectedPolicyId) {
       return;
     }
 
@@ -999,6 +1002,9 @@ private showLinkTools(linkView: dia.LinkView): void {
     }
 
     switch (event.action) {
+      case 'full-sync':
+        this.applyRemoteFullSync(event);
+        return;
       case 'move':
         this.applyRemoteMove(event);
         return;
@@ -1112,6 +1118,31 @@ private showLinkTools(linkView: dia.LinkView): void {
     }
   }
 
+  private applyRemoteFullSync(event: DiagramEvent): void {
+    const payloadDiagram = event.payload?.['diagram'];
+    if (!payloadDiagram || typeof payloadDiagram !== 'object') {
+      return;
+    }
+
+    const payloadLanes = event.payload?.['lanes'];
+    const incomingLanes = Array.isArray(payloadLanes) ? payloadLanes as Lane[] : this.lanes;
+
+    const fullPolicy: PolicyPayload = {
+      id: this.selectedPolicyId ?? '',
+      name: this.policyName || 'Politica',
+      description: '',
+      diagramJson: JSON.stringify(payloadDiagram),
+      lanes: incomingLanes
+    };
+
+    this.isRemoteChange = true;
+    try {
+      this.applyPolicy(fullPolicy);
+    } finally {
+      this.isRemoteChange = false;
+    }
+  }
+
   private async loadCompanyAreas(): Promise<void> {
     try {
       this.availableAreas = await this.companyAreaService.getCompanyAreas();
@@ -1155,6 +1186,7 @@ private showLinkTools(linkView: dia.LinkView): void {
 
   private applyPolicy(policy: PolicyPayload): void {
     this.suppressAutoSave = true;
+    this.isApplyingPolicySnapshot = true;
     try {
       this.selectedSourceId = null;
       this.selectedTargetId = null;
@@ -1164,8 +1196,27 @@ private showLinkTools(linkView: dia.LinkView): void {
       this.diagramCanvasService.renderPolicy(this.graph, policy, this.lanes);
       this.diagramStorageService.clear();
     } finally {
+      this.isApplyingPolicySnapshot = false;
       this.suppressAutoSave = false;
     }
+  }
+
+  private broadcastFullSync(diagram: Record<string, unknown>, lanes: Lane[]): void {
+    if (!this.selectedPolicyId || this.isRemoteChange) {
+      return;
+    }
+
+    const event: DiagramEvent = {
+      action: 'full-sync',
+      cellId: 'policy',
+      payload: {
+        diagram,
+        lanes,
+        clientId: this.clientId
+      }
+    };
+
+    this.webSocketService.sendMessage(this.selectedPolicyId, event);
   }
 
   private normalizeLanesFromAreas(sourceLanes: Lane[]): Lane[] {
@@ -1284,7 +1335,12 @@ private showLinkTools(linkView: dia.LinkView): void {
 
     try {
       const currentDiagram = this.graph.toJSON();
-      const response = await this.copilotService.sendMessage(text, currentDiagram);
+      const response = await this.copilotService.sendMessage(text, currentDiagram, {
+        conversationId: this.copilotConversationId,
+        policyId: this.selectedPolicyId,
+        policyName: this.policyName
+      });
+      this.copilotConversationId = response.conversationId ?? this.copilotConversationId;
       this.copilotMessages = [
         ...this.copilotMessages,
         {
@@ -1313,6 +1369,14 @@ private showLinkTools(linkView: dia.LinkView): void {
           lanes: this.lanes
         };
         this.applyPolicy(updatedPolicy);
+        if (this.selectedPolicyId) {
+          await this.policyDataService.updatePolicyDiagram(
+            this.selectedPolicyId,
+            JSON.stringify(apply.diagram),
+            this.lanes
+          );
+        }
+        this.broadcastFullSync(apply.diagram as Record<string, unknown>, this.lanes);
 
         const warnings = apply.warnings?.length ? ` | Advertencias: ${apply.warnings.join(' | ')}` : '';
         this.copilotMessages = [
@@ -1342,6 +1406,30 @@ private showLinkTools(linkView: dia.LinkView): void {
     } finally {
       this.copilotLoading = false;
       this.cdr.detectChanges();
+    }
+  }
+
+  private async loadCopilotHistory(policyId: string): Promise<void> {
+    this.copilotMessages = [];
+    this.copilotConversationId = null;
+
+    try {
+      const history = await this.copilotService.getHistoryByPolicy(policyId);
+      if (!history || !history.messages || history.messages.length === 0) {
+        return;
+      }
+
+      this.copilotConversationId = history.conversationId ?? null;
+      this.copilotMessages = history.messages.map((message) => ({
+        role: (message.role as 'user' | 'assistant' | 'system') ?? 'assistant',
+        text: message.text ?? '',
+        timestamp: message.timestamp
+          ? new Date(message.timestamp).toLocaleTimeString()
+          : new Date().toLocaleTimeString(),
+        suggestedActions: message.suggestedActions ?? []
+      }));
+    } catch (error) {
+      this.infoMessage = `No se pudo cargar el historial del Copilot: ${error}`;
     }
   }
 

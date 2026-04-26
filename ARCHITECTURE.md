@@ -23,6 +23,20 @@
 `-- ARCHITECTURE.md
 ```
 
+## Frontend Enterprise UI System
+
+La capa Angular ahora sigue un sistema visual unificado para todas las pantallas de gestion:
+
+- Header global de plataforma (`Enterprise BPMN Suite`) en `app.ts/app.scss`.
+- Tokens de diseno globales en `frontend/src/styles.scss`:
+  - Primario: `#1E3A8A`
+  - Accion positiva: `#10B981`
+  - Panel lateral: `#F3F4F6`
+  - Canvas: `#F9FAFB`
+  - Texto principal/secundario: `#374151` / `#6B7280`
+- Mismo patron de componentes para tablas, tarjetas, formularios y estados interactivos.
+- Disenador BPMN modernizado con sidebar por secciones, lanes tipo gestor visual, chat lateral premium y grilla sutil de lienzo.
+
 ## Attachment Upload Flow to Amazon S3
 
 1. User selects a file in the policy designer task form.
@@ -92,6 +106,14 @@ All services share network `bpmn-net`.
   - `POST /api/copilot/chat` (Spring Boot)
 - Spring Boot reenvía a:
   - `POST http://bpmn-ai-engine:8010/api/ai/copilot-chat` (en Docker network)
+
+## Copilot Chat History
+
+- Persistencia en MongoDB (`copilot_conversations`) por usuario y politica.
+- Endpoints:
+  - `POST /api/copilot/chat` guarda mensajes y respuesta de IA.
+  - `GET /api/copilot/history?policyId={id}` recupera historial previo.
+- El gateway incluye historial reciente como `conversation_history` al motor IA.
 
 ## Notes for ECS/Fargate
 

@@ -4,6 +4,7 @@ import { AuthService } from '../../../auth.service';
 export interface CopilotResponse {
   message: string;
   suggestedActions: string[];
+  conversationId?: string | null;
 }
 
 export interface CopilotApplyResponse {
@@ -13,6 +14,28 @@ export interface CopilotApplyResponse {
   diagram: Record<string, unknown>;
 }
 
+export interface CopilotConversationMessage {
+  role: 'user' | 'assistant' | 'system';
+  text: string;
+  timestamp?: string | null;
+  suggestedActions?: string[];
+}
+
+export interface CopilotConversation {
+  conversationId?: string | null;
+  policyId?: string | null;
+  policyName?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  messages: CopilotConversationMessage[];
+}
+
+export interface CopilotChatOptions {
+  conversationId?: string | null;
+  policyId?: string | null;
+  policyName?: string | null;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -20,13 +43,20 @@ export class CopilotService {
   private readonly authService = inject(AuthService);
   private readonly baseUrl = '/api/copilot';
 
-  public async sendMessage(userText: string, currentDiagram: unknown): Promise<CopilotResponse> {
+  public async sendMessage(
+    userText: string,
+    currentDiagram: unknown,
+    options: CopilotChatOptions = {}
+  ): Promise<CopilotResponse> {
     const response = await fetch(`${this.baseUrl}/chat`, {
       method: 'POST',
       headers: this.authHeaders,
       body: JSON.stringify({
         userMessage: userText,
-        currentDiagram
+        currentDiagram,
+        conversationId: options.conversationId ?? null,
+        policyId: options.policyId ?? null,
+        policyName: options.policyName ?? null
       })
     });
 
@@ -36,6 +66,26 @@ export class CopilotService {
     }
 
     return response.json();
+  }
+
+  public async getHistoryByPolicy(policyId: string): Promise<CopilotConversation | null> {
+    const safePolicyId = (policyId ?? '').trim();
+    if (!safePolicyId) {
+      return null;
+    }
+
+    const response = await fetch(`${this.baseUrl}/history?policyId=${encodeURIComponent(safePolicyId)}`, {
+      method: 'GET',
+      headers: this.authHeaders
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Copilot History HTTP ${response.status}: ${error || 'No se pudo cargar el historial.'}`);
+    }
+
+    const payload = await response.json() as CopilotConversation;
+    return payload;
   }
 
   public async applyChange(

@@ -5,15 +5,15 @@
 .admin-layout {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 280px 1fr;
-  background: linear-gradient(140deg, #eef2ff 0%, #f8fafc 45%, #f1f5f9 100%);
+  grid-template-columns: 240px 1fr;
+  background: var(--color-bg-app);
 }
 
 .sidebar {
-  background: #0f172a;
-  color: #e2e8f0;
-  padding: 28px 20px;
-  border-right: 1px solid rgba(148, 163, 184, 0.25);
+  background: var(--color-bg-panel);
+  color: var(--color-text-main);
+  padding: 24px 16px;
+  border-right: 1px solid var(--color-border);
   position: sticky;
   top: 0;
   height: 100vh;
@@ -21,43 +21,45 @@
 
 .brand h1 {
   margin: 0;
-  font-size: 1.3rem;
+  color: var(--color-primary);
+  font-size: 1.1rem;
 }
 
 .brand p {
   margin: 6px 0 0;
-  color: #94a3b8;
-  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
 }
 
 .menu {
-  margin-top: 28px;
+  margin-top: 22px;
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .menu a {
   text-decoration: none;
-  color: #cbd5e1;
+  color: var(--color-text-main);
   font-weight: 600;
-  padding: 10px 12px;
-  border-radius: 10px;
+  padding: 10px;
+  border-radius: var(--radius-md);
   border: 1px solid transparent;
   transition: all 0.2s ease;
 }
 
 .menu a:hover {
-  background: rgba(148, 163, 184, 0.15);
+  background: rgba(30, 58, 138, 0.07);
+  border-color: rgba(30, 58, 138, 0.12);
 }
 
 .menu a.active {
-  color: #e0f2fe;
-  background: rgba(14, 165, 233, 0.2);
-  border-color: rgba(56, 189, 248, 0.45);
+  color: var(--color-primary);
+  background: #eaf0ff;
+  border-color: #c7d2fe;
 }
 
 .content {
-  padding: 26px;
+  padding: 22px;
 }
 
 @media (max-width: 960px) {

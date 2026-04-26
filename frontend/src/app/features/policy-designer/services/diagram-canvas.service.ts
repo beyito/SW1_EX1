@@ -23,14 +23,20 @@ export class DiagramCanvasService {
   public createPaper(graph: dia.Graph): dia.Paper {
     return new dia.Paper({
       model: graph,
-      background: { color: '#F8F9FA' },
+      background: { color: '#F9FAFB' },
       async: true,
       sorting: dia.Paper.sorting.APPROX,
       cellViewNamespace: shapes,
       width: this.width,
       height: this.height,
-      gridSize: 10,
-      drawGrid: true,
+      gridSize: 20,
+      drawGrid: {
+        name: 'mesh',
+        args: [
+          { color: 'rgba(148, 163, 184, 0.18)', thickness: 1 },
+          { color: 'rgba(148, 163, 184, 0.08)', scaleFactor: 5, thickness: 1 }
+        ]
+      },
 
       // 🚩 1. CONFIGURACIÓN DE MAGNETISMO Y RECONEXIÓN
       snapLinks: { radius: 30 }, // El imán atrapará el nodo si lo sueltas a 30px de distancia
@@ -79,8 +85,8 @@ export class DiagramCanvasService {
               portBody: {
                 magnet: true,
                 r: magnetSize,
-                fill: '#3b82f6',
-                stroke: '#1e40af',
+                fill: '#1E3A8A',
+                stroke: '#1E3A8A',
                 strokeWidth: 2,
                 opacity: 0
               }
@@ -92,8 +98,8 @@ export class DiagramCanvasService {
               portBody: {
                 magnet: true,
                 r: magnetSize,
-                fill: '#3b82f6',
-                stroke: '#1e40af',
+                fill: '#1E3A8A',
+                stroke: '#1E3A8A',
                 strokeWidth: 2,
                 opacity: 0
               }
@@ -104,12 +110,12 @@ export class DiagramCanvasService {
       attrs: {
         body: {
           fill: '#ffffff',
-          stroke: '#3b82f6',
+          stroke: '#1E3A8A',
           strokeWidth: 2
         },
         label: {
           text: label,
-          fill: '#1f2937',
+          fill: '#374151',
           fontSize: 14,
           fontWeight: '600',
           textWrap: { width: -10, height: -10 }
@@ -126,7 +132,7 @@ export class DiagramCanvasService {
           size: { width: 80, height: 80 },
           attrs: {
             ...baseOptions.attrs,
-            body: { ...baseOptions.attrs.body, fill: '#d1fae5', stroke: '#10b981' }
+            body: { ...baseOptions.attrs.body, fill: '#ecfdf5', stroke: '#10B981' }
           }
         });
         break;
@@ -137,8 +143,8 @@ export class DiagramCanvasService {
           attrs: {
             body: {
               refPoints: '0,60 60,0 120,60 60,120',
-              fill: '#fbbf24',
-              stroke: '#b45309',
+              fill: '#fffbeb',
+              stroke: '#d97706',
               strokeWidth: 2
             },
             label: { ...baseOptions.attrs.label, text: label }
@@ -151,8 +157,8 @@ export class DiagramCanvasService {
           size: { width: 160, height: 20 },
           attrs: {
             body: {
-              fill: '#000000',
-              stroke: '#000000',
+              fill: '#1f2937',
+              stroke: '#1f2937',
               strokeWidth: 2,
               rx: 0,
               ry: 0
@@ -183,8 +189,8 @@ export class DiagramCanvasService {
           size: { width: 20, height: 160 },
           attrs: {
             body: {
-              fill: '#000000',
-              stroke: '#000000',
+              fill: '#1f2937',
+              stroke: '#1f2937',
               strokeWidth: 2,
               rx: 0,
               ry: 0
@@ -199,7 +205,7 @@ export class DiagramCanvasService {
           size: { width: 90, height: 90 },
           attrs: {
             ...baseOptions.attrs,
-            body: { ...baseOptions.attrs.body, fill: '#fee2e2', stroke: '#ef4444', strokeWidth: 4 }
+            body: { ...baseOptions.attrs.body, fill: '#fef2f2', stroke: '#ef4444', strokeWidth: 4 }
           }
         });
         break;
@@ -209,7 +215,7 @@ export class DiagramCanvasService {
           size: { width: 140, height: 70 },
           attrs: {
             ...baseOptions.attrs,
-            body: { ...baseOptions.attrs.body, rx: 8, ry: 8, fill: '#eff6ff' }
+            body: { ...baseOptions.attrs.body, rx: 12, ry: 12, fill: '#f8fafc', stroke: '#1E3A8A' }
           }
         });
     }
@@ -243,16 +249,16 @@ export class DiagramCanvasService {
     link.toBack();
     link.attr({
       line: {
-        stroke: '#0f172a',
-        strokeWidth: 3,
+        stroke: '#1E3A8A',
+        strokeWidth: 2.5,
         strokeLinecap: 'round',
         strokeLinejoin: 'round',
         sourceMarker: null, // Sin marcador en el origen
         targetMarker: {
           type: 'path',
           d: 'M 10 -5 0 0 10 5 z',
-          fill: '#0f172a',
-          stroke: '#0f172a',
+          fill: '#1E3A8A',
+          stroke: '#1E3A8A',
           'stroke-width': 1
         }
       }
@@ -268,13 +274,13 @@ export class DiagramCanvasService {
         attrs: {
           text: {
             text: condition,
-            fill: '#0f172a',
+            fill: '#1E3A8A',
             fontSize: 13,
             fontWeight: 'bold'
           },
           rect: {
             fill: '#ffffff',
-            stroke: '#0f172a',
+            stroke: '#1E3A8A',
             strokeWidth: 1,
             rx: 3,
             ry: 3
@@ -311,22 +317,22 @@ public renderLaneBackgrounds(graph: dia.Graph, lanes: Lane[]): void {
         attrs: {
           // El cuerpo de la calle
           body: {
-            fill: lane.color,
-            fillOpacity: 0.15, // IMPORTANTE: fillOpacity para no afectar la cabecera
-            stroke: '#cbd5e1', 
+            fill: '#ffffff',
+            fillOpacity: 0.6, // IMPORTANTE: fillOpacity para no afectar la cabecera
+            stroke: '#d1d5db', 
             strokeWidth: 1
           },
           // La cabecera
           header: {
-            fill: lane.color, 
+            fill: '#eef2ff', 
             height: headerHeight,
-            stroke: '#cbd5e1', 
+            stroke: '#d1d5db', 
             strokeWidth: 1
           },
           // El texto de la cabecera
           headerText: {
             text: lane.name.toUpperCase(), 
-            fill: '#0f172a',
+            fill: '#1E3A8A',
             fontSize: 14,
             fontWeight: 'bold',
             refX: 20,
@@ -475,13 +481,13 @@ public renderLaneBackgrounds(graph: dia.Graph, lanes: Lane[]): void {
         attrs: {
           text: {
             text: cleanLabel,
-            fill: '#0f172a',
+            fill: '#1E3A8A',
             fontSize: 13,
             fontWeight: 'bold'
           },
           rect: {
             fill: '#ffffff',
-            stroke: '#0f172a',
+            stroke: '#1E3A8A',
             strokeWidth: 1,
             rx: 3,
             ry: 3

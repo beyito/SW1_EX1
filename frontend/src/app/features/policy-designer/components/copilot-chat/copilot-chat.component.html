@@ -1,39 +1,50 @@
 <aside class="copilot-shell">
   <header class="copilot-header">
-    <h3>BPMN Copilot</h3>
-    <button type="button" class="analyze-btn" (click)="requestAnalyze()" [disabled]="loading">
-      Analizar mi diagrama actual
-    </button>
+    <div>
+      <h3>Asistente BPMN</h3>
+      <p>Analisis contextual del diagrama en tiempo real.</p>
+    </div>
   </header>
 
   <section class="messages">
     @if (messages.length === 0) {
-      <p class="empty-hint">Escribe una pregunta o analiza el diagrama para comenzar.</p>
+      <p class="empty-hint">Envia una consulta o ejecuta un analisis rapido.</p>
     } @else {
       @for (msg of messages; track msg.timestamp + msg.role) {
-        <div class="bubble" [class.user]="msg.role === 'user'" [class.assistant]="msg.role !== 'user'">
-          <p>{{ msg.text }}</p>
-          @if (msg.suggestedActions && msg.suggestedActions.length > 0) {
-            <ul>
-              @for (action of msg.suggestedActions; track action) {
-                <li>{{ action }}</li>
-              }
-            </ul>
-          }
-          <small>{{ msg.timestamp }}</small>
+        <div class="message-row" [class.user-row]="msg.role === 'user'">
+          <div class="avatar" [class.user-avatar]="msg.role === 'user'">
+            {{ msg.role === 'user' ? 'U' : 'AI' }}
+          </div>
+          <div class="bubble" [class.user]="msg.role === 'user'" [class.assistant]="msg.role !== 'user'">
+            <p>{{ msg.text }}</p>
+            @if (msg.suggestedActions && msg.suggestedActions.length > 0) {
+              <ul>
+                @for (action of msg.suggestedActions; track action) {
+                  <li>{{ action }}</li>
+                }
+              </ul>
+            }
+            <small>{{ msg.timestamp }}</small>
+          </div>
         </div>
       }
     }
   </section>
 
   <footer class="composer">
-    <textarea
-      [(ngModel)]="inputText"
-      rows="3"
-      placeholder="Pregúntale al copilot sobre tu flujo BPMN..."
-      [disabled]="loading"></textarea>
-    <button type="button" (click)="submitMessage()" [disabled]="loading || !inputText.trim()">
-      {{ loading ? 'Enviando...' : 'Enviar' }}
+    <button type="button" class="quick-analyze" (click)="requestAnalyze()" [disabled]="loading">
+      Analizar diagrama actual
     </button>
+    <div class="composer-row">
+      <button class="icon-btn" type="button" [disabled]="loading" title="Microfono">Mic</button>
+      <textarea
+        [(ngModel)]="inputText"
+        rows="2"
+        placeholder="Consulta de modelado BPMN..."
+        [disabled]="loading"></textarea>
+      <button type="button" class="send-btn" (click)="submitMessage()" [disabled]="loading || !inputText.trim()">
+        {{ loading ? '...' : 'Enviar' }}
+      </button>
+    </div>
   </footer>
 </aside>

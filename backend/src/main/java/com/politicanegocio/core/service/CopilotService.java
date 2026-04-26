@@ -1,9 +1,14 @@
 package com.politicanegocio.core.service;
 
-import com.politicanegocio.core.dto.CopilotRequestDto;
 import com.politicanegocio.core.dto.CopilotApplyRequestDto;
 import com.politicanegocio.core.dto.CopilotApplyResponseDto;
+import com.politicanegocio.core.dto.CopilotConversationDto;
+import com.politicanegocio.core.dto.CopilotHistoryMessageDto;
+import com.politicanegocio.core.dto.CopilotRequestDto;
 import com.politicanegocio.core.dto.CopilotResponseDto;
+import com.politicanegocio.core.model.CopilotConversation;
+import com.politicanegocio.core.model.User;
+import com.politicanegocio.core.repository.CopilotConversationRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,18 +20,29 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.UUID;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
 
 @Service
 public class CopilotService {
     private static final Logger log = LoggerFactory.getLogger(CopilotService.class);
+    private static final int MAX_HISTORY_FOR_AI = 20;
 
     private final RestClient restClient;
     private final String aiEngineBaseUrl;
+    private final CopilotConversationRepository copilotConversationRepository;
 
-    public CopilotService(@Value("${app.ai-engine.base-url:http://127.0.0.1:8010}") String aiEngineBaseUrl) {
+    public CopilotService(
+            @Value("${app.ai-engine.base-url:http://127.0.0.1:8010}") String aiEngineBaseUrl,
+            CopilotConversationRepository copilotConversationRepository
+    ) {
         this.aiEngineBaseUrl = aiEngineBaseUrl;
+        this.copilotConversationRepository = copilotConversationRepository;
 
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(10000);
@@ -40,8 +56,9 @@ public class CopilotService {
         log.info("CopilotService initialized with aiEngineBaseUrl={}", aiEngineBaseUrl);
     }
 
-    public CopilotResponseDto chat(CopilotRequestDto request) {
+    public CopilotResponseDto chat(CopilotRequestDto request, User actor) {
         String requestId = UUID.randomUUID().toString();
+        User safeActor = requireActor(actor);
 
         if (request == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request vacio para copilot.");
@@ -51,38 +68,61 @@ public class CopilotService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "userMessage es obligatorio.");
         }
 
+        CopilotConversation conversation = resolveConversation(safeActor, request);
+        List<Map<String, Object>> historyForAi = toAiHistory(conversation.getMessages());
+
         long startMillis = System.currentTimeMillis();
         log.info(
-                "Copilot gateway request start requestId={} aiBaseUrl={} messageLength={} hasDiagram={}",
+                "Copilot gateway request start requestId={} aiBaseUrl={} messageLength={} hasDiagram={} historySize={} conversationId={}",
                 requestId,
                 aiEngineBaseUrl,
                 userMessage.length(),
-                request.currentDiagram() != null
+                request.currentDiagram() != null,
+                historyForAi.size(),
+                conversation.getId()
         );
 
         try {
-            CopilotResponseDto response = restClient.post()
+            Map<String, Object> aiPayload = new HashMap<>();
+            aiPayload.put("userMessage", userMessage);
+            aiPayload.put("currentDiagram", request.currentDiagram() == null ? Map.of() : request.currentDiagram());
+            aiPayload.put("history", historyForAi);
+
+            CopilotResponseDto aiResponse = restClient.post()
                     .uri("/api/ai/copilot-chat")
                     .header("X-Request-Id", requestId)
-                    .body(request)
+                    .body(aiPayload)
                     .retrieve()
                     .body(CopilotResponseDto.class);
 
-            if (response == null) {
+            if (aiResponse == null) {
                 throw new ResponseStatusException(
                         HttpStatus.BAD_GATEWAY,
                         "El microservicio IA devolvio respuesta vacia. requestId=" + requestId
                 );
             }
 
+            appendMessage(conversation, "user", userMessage, List.of());
+            appendMessage(conversation, "assistant", aiResponse.message(), aiResponse.suggestedActions());
+            conversation.setUpdatedAt(LocalDateTime.now());
+            if (request.policyName() != null && !request.policyName().isBlank()) {
+                conversation.setPolicyName(request.policyName().trim());
+            }
+            CopilotConversation savedConversation = copilotConversationRepository.save(conversation);
+
             log.info(
-                    "Copilot gateway request success requestId={} elapsedMs={} suggestedActions={}",
+                    "Copilot gateway request success requestId={} elapsedMs={} suggestedActions={} conversationId={}",
                     requestId,
                     (System.currentTimeMillis() - startMillis),
-                    response.suggestedActions() == null ? 0 : response.suggestedActions().size()
+                    aiResponse.suggestedActions() == null ? 0 : aiResponse.suggestedActions().size(),
+                    savedConversation.getId()
             );
 
-            return response;
+            return new CopilotResponseDto(
+                    aiResponse.message(),
+                    aiResponse.suggestedActions(),
+                    savedConversation.getId()
+            );
         } catch (ResourceAccessException exception) {
             String rootCause = exception.getMostSpecificCause() != null
                     ? exception.getMostSpecificCause().toString()
@@ -142,6 +182,33 @@ public class CopilotService {
                     exception
             );
         }
+    }
+
+    public CopilotConversationDto getConversationHistory(User actor, String policyId, String conversationId) {
+        User safeActor = requireActor(actor);
+
+        CopilotConversation conversation = null;
+        if (conversationId != null && !conversationId.isBlank()) {
+            conversation = copilotConversationRepository.findByIdAndOwnerUsername(conversationId.trim(), safeActor.getUsername())
+                    .orElse(null);
+        } else if (policyId != null && !policyId.isBlank()) {
+            conversation = copilotConversationRepository
+                    .findTopByOwnerUsernameAndPolicyIdOrderByUpdatedAtDesc(safeActor.getUsername(), policyId.trim())
+                    .orElse(null);
+        }
+
+        if (conversation == null) {
+            return new CopilotConversationDto(
+                    null,
+                    policyId,
+                    null,
+                    null,
+                    null,
+                    List.of()
+            );
+        }
+
+        return toConversationDto(conversation);
     }
 
     public CopilotApplyResponseDto apply(CopilotApplyRequestDto request) {
@@ -204,5 +271,116 @@ public class CopilotService {
                     exception
             );
         }
+    }
+
+    private User requireActor(User actor) {
+        if (actor == null || actor.getUsername() == null || actor.getUsername().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuario no autenticado para Copilot.");
+        }
+        return actor;
+    }
+
+    private CopilotConversation resolveConversation(User actor, CopilotRequestDto request) {
+        String conversationId = request.conversationId() == null ? "" : request.conversationId().trim();
+        String policyId = request.policyId() == null ? "" : request.policyId().trim();
+        String policyName = request.policyName() == null ? "" : request.policyName().trim();
+
+        CopilotConversation conversation = null;
+        if (!conversationId.isBlank()) {
+            conversation = copilotConversationRepository.findByIdAndOwnerUsername(conversationId, actor.getUsername())
+                    .orElse(null);
+        }
+
+        if (conversation == null && !policyId.isBlank()) {
+            conversation = copilotConversationRepository
+                    .findTopByOwnerUsernameAndPolicyIdOrderByUpdatedAtDesc(actor.getUsername(), policyId)
+                    .orElse(null);
+        }
+
+        if (conversation != null) {
+            if (!policyId.isBlank()) {
+                conversation.setPolicyId(policyId);
+            }
+            if (!policyName.isBlank()) {
+                conversation.setPolicyName(policyName);
+            }
+            return conversation;
+        }
+
+        CopilotConversation newConversation = new CopilotConversation();
+        newConversation.setOwnerUsername(actor.getUsername());
+        newConversation.setCompany(actor.getCompany());
+        newConversation.setPolicyId(policyId.isBlank() ? null : policyId);
+        newConversation.setPolicyName(policyName.isBlank() ? null : policyName);
+        LocalDateTime now = LocalDateTime.now();
+        newConversation.setCreatedAt(now);
+        newConversation.setUpdatedAt(now);
+        return newConversation;
+    }
+
+    private List<Map<String, Object>> toAiHistory(List<CopilotConversation.CopilotMessage> messages) {
+        if (messages == null || messages.isEmpty()) {
+            return List.of();
+        }
+        int fromIndex = Math.max(0, messages.size() - MAX_HISTORY_FOR_AI);
+        List<CopilotConversation.CopilotMessage> recent = messages.subList(fromIndex, messages.size());
+
+        List<Map<String, Object>> history = new ArrayList<>(recent.size());
+        for (CopilotConversation.CopilotMessage message : recent) {
+            if (message == null || message.getText() == null || message.getText().isBlank()) {
+                continue;
+            }
+            Map<String, Object> item = new HashMap<>();
+            item.put("role", message.getRole() == null ? "assistant" : message.getRole());
+            item.put("text", message.getText());
+            if (message.getTimestamp() != null) {
+                item.put("timestamp", message.getTimestamp().toString());
+            }
+            history.add(item);
+        }
+        return history;
+    }
+
+    private void appendMessage(
+            CopilotConversation conversation,
+            String role,
+            String text,
+            List<String> suggestedActions
+    ) {
+        if (text == null || text.isBlank()) {
+            return;
+        }
+        CopilotConversation.CopilotMessage message = new CopilotConversation.CopilotMessage();
+        message.setRole(role);
+        message.setText(text);
+        message.setTimestamp(LocalDateTime.now());
+        message.setSuggestedActions(suggestedActions == null ? List.of() : suggestedActions.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .toList());
+        conversation.getMessages().add(message);
+    }
+
+    private CopilotConversationDto toConversationDto(CopilotConversation conversation) {
+        List<CopilotHistoryMessageDto> messages = conversation.getMessages() == null
+                ? List.of()
+                : conversation.getMessages().stream()
+                .map(message -> new CopilotHistoryMessageDto(
+                        message.getRole(),
+                        message.getText(),
+                        message.getTimestamp(),
+                        message.getSuggestedActions() == null ? List.of() : message.getSuggestedActions()
+                ))
+                .toList();
+
+        return new CopilotConversationDto(
+                conversation.getId(),
+                conversation.getPolicyId(),
+                conversation.getPolicyName(),
+                conversation.getCreatedAt(),
+                conversation.getUpdatedAt(),
+                messages
+        );
     }
 }

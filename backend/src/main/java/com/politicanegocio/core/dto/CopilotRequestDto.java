@@ -4,6 +4,9 @@ import java.util.Map;
 
 public record CopilotRequestDto(
         String userMessage,
-        Map<String, Object> currentDiagram
+        Map<String, Object> currentDiagram,
+        String conversationId,
+        String policyId,
+        String policyName
 ) {
 }
