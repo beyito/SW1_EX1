@@ -4,16 +4,21 @@ import { Lane, LinkCondition, PolicyPayload } from '../models/policy-designer.mo
 
 @Injectable({ providedIn: 'root' })
 export class DiagramCanvasService {
-  private readonly width = 1200;
-  private readonly height = 800;
+  private canvasWidth = 1200;
+  private canvasHeight = 800;
   private laneBackgrounds: dia.Element[] = [];
 
   public getCanvasWidth(): number {
-    return this.width;
+    return this.canvasWidth;
   }
 
   public getCanvasHeight(): number {
-    return this.height;
+    return this.canvasHeight;
+  }
+
+  public setCanvasDimensions(width: number, height: number): void {
+    this.canvasWidth = Math.max(320, Math.floor(width));
+    this.canvasHeight = Math.max(240, Math.floor(height));
   }
 
   public createGraph(): dia.Graph {
@@ -27,8 +32,8 @@ export class DiagramCanvasService {
       async: true,
       sorting: dia.Paper.sorting.APPROX,
       cellViewNamespace: shapes,
-      width: this.width,
-      height: this.height,
+      width: this.canvasWidth,
+      height: this.canvasHeight,
       gridSize: 20,
       drawGrid: {
         name: 'mesh',
@@ -312,7 +317,7 @@ public renderLaneBackgrounds(graph: dia.Graph, lanes: Lane[]): void {
       const laneShape = new shapes.standard.HeaderedRectangle({
         z: -10, // Se queda al fondo
         position: { x: positionX, y: 0 },
-        size: { width: laneWidth, height: this.height },
+        size: { width: laneWidth, height: this.canvasHeight },
         isLaneBackground: true,
         attrs: {
           // El cuerpo de la calle
@@ -406,11 +411,11 @@ public renderLaneBackgrounds(graph: dia.Graph, lanes: Lane[]): void {
   }
 
   public clampNodeX(x: number, nodeWidth: number): number {
-    return Math.max(10, Math.min(x, this.width - nodeWidth - 10));
+    return Math.max(10, Math.min(x, this.canvasWidth - nodeWidth - 10));
   }
 
   public clampNodeY(y: number, nodeHeight: number): number {
-    return Math.max(54, Math.min(y, this.height - nodeHeight - 10));
+    return Math.max(54, Math.min(y, this.canvasHeight - nodeHeight - 10));
   }
 
   public recalculateLanePositions(lanes: Lane[]): Lane[] {
@@ -438,6 +443,19 @@ public renderLaneBackgrounds(graph: dia.Graph, lanes: Lane[]): void {
   public clearLaneBackgrounds(): void {
     this.laneBackgrounds.forEach((background) => background.remove());
     this.laneBackgrounds = [];
+  }
+
+  public updateLaneBackgroundLayout(lanes: Lane[]): void {
+    if (lanes.length === 0 || this.laneBackgrounds.length !== lanes.length) {
+      return;
+    }
+
+    const laneWidth = this.getLaneWidth(lanes.length);
+    this.laneBackgrounds.forEach((background, index) => {
+      background.position(index * laneWidth, 0);
+      background.resize(laneWidth, this.canvasHeight);
+      background.attr('headerText/text', lanes[index].name.toUpperCase());
+    });
   }
 
   public updateNodeLabel(element: dia.Element, newLabel: string): void {
@@ -503,6 +521,6 @@ public renderLaneBackgrounds(graph: dia.Graph, lanes: Lane[]): void {
   }
 
   private getLaneWidth(laneCount: number): number {
-    return laneCount > 0 ? this.width / laneCount : this.width;
+    return laneCount > 0 ? this.canvasWidth / laneCount : this.canvasWidth;
   }
 }

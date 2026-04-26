@@ -1,5 +1,5 @@
 import { CommonModule, NgFor, NgIf } from '@angular/common';
-import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild, inject, ChangeDetectorRef } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild, inject, ChangeDetectorRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 // 🚩 IMPORTANTE: Importamos linkTools, elementTools y ui
 import { dia, shapes, linkTools, elementTools, ui } from '@joint/plus'; 
@@ -55,7 +55,17 @@ export class PolicyDesignerComponent implements OnInit, AfterViewInit, OnDestroy
   private readonly clientId = crypto.randomUUID();
   
   // 🚩 Variable para controlar el recuadro de redimensionamiento
-  private freeTransform: any = null; 
+  private freeTransform: any = null;
+  private resizeObserver: ResizeObserver | null = null;
+  private readonly minZoom = 0.2;
+  private readonly maxZoom = 2.0;
+  private readonly zoomStep = 0.1;
+  private currentScale = 1;
+  private isCanvasPanning = false;
+  private panStartClientX = 0;
+  private panStartClientY = 0;
+  private panStartTranslateX = 0;
+  private panStartTranslateY = 0;
 
   public readonly nodeTemplates = NODE_TEMPLATES;
   public policyName = '';
@@ -104,9 +114,13 @@ export class PolicyDesignerComponent implements OnInit, AfterViewInit, OnDestroy
 
   public ngAfterViewInit(): void {
     this.diagramCanvasService.mountPaper(this.canvas, this.paper);
+    this.initializeResponsiveCanvas();
   }
 
   public ngOnDestroy(): void {
+    this.stopCanvasPanning();
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
     this.cellSyncTimeouts.forEach((timeoutId) => clearTimeout(timeoutId));
     this.cellSyncTimeouts.clear();
     if (this.autoSaveTimeout) {
@@ -115,6 +129,87 @@ export class PolicyDesignerComponent implements OnInit, AfterViewInit, OnDestroy
     }
     this.policySubscription?.unsubscribe();
     this.webSocketService.disconnect();
+  }
+
+  @HostListener('wheel', ['$event'])
+  public onCanvasWheel(event: WheelEvent): void {
+    if (!this.canvas?.nativeElement?.contains(event.target as Node)) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const currentScale = this.paper.scale().sx ?? this.currentScale;
+    const direction = event.deltaY < 0 ? 1 : -1;
+    const nextScale = this.clamp(currentScale + direction * this.zoomStep, this.minZoom, this.maxZoom);
+
+    if (nextScale === currentScale) {
+      return;
+    }
+
+    const canvasRect = this.canvas.nativeElement.getBoundingClientRect();
+    const cursorX = event.clientX - canvasRect.left;
+    const cursorY = event.clientY - canvasRect.top;
+    const translation = this.getPaperTranslation();
+
+    // Convertimos el punto del cursor a coordenadas del "mundo" antes del zoom.
+    const worldX = (cursorX - translation.x) / currentScale;
+    const worldY = (cursorY - translation.y) / currentScale;
+
+    this.paper.scale(nextScale, nextScale);
+
+    // Recalculamos la traslacion para que el mismo punto del mundo quede bajo el cursor tras escalar.
+    const nextTranslateX = cursorX - worldX * nextScale;
+    const nextTranslateY = cursorY - worldY * nextScale;
+    this.paper.translate(nextTranslateX, nextTranslateY);
+
+    this.currentScale = nextScale;
+  }
+
+  private initializeResponsiveCanvas(): void {
+    const canvasElement = this.canvas.nativeElement as HTMLElement;
+    const setCanvasSize = (width: number, height: number): void => {
+      const nextWidth = Math.max(320, Math.floor(width));
+      const nextHeight = Math.max(240, Math.floor(height));
+
+      this.paper.setDimensions(nextWidth, nextHeight);
+      this.diagramCanvasService.setCanvasDimensions(nextWidth, nextHeight);
+
+      if (this.lanes.length > 0) {
+        this.lanes = this.diagramCanvasService.recalculateLanePositions(this.lanes);
+        this.diagramCanvasService.updateLaneBackgroundLayout(this.lanes);
+      }
+    };
+
+    const initialRect = canvasElement.getBoundingClientRect();
+    setCanvasSize(initialRect.width, initialRect.height);
+
+    this.resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setCanvasSize(entry.contentRect.width, entry.contentRect.height);
+      }
+    });
+    this.resizeObserver.observe(canvasElement);
+  }
+
+  private getPaperTranslation(): { x: number; y: number } {
+    const translation = this.paper.translate() as { tx?: number; ty?: number; x?: number; y?: number };
+    return {
+      x: translation.tx ?? translation.x ?? 0,
+      y: translation.ty ?? translation.y ?? 0
+    };
+  }
+
+  private mapClientToPaper(clientX: number, clientY: number): { x: number; y: number } {
+    const canvasRect = this.canvas.nativeElement.getBoundingClientRect();
+    const translation = this.getPaperTranslation();
+    const scale = this.paper.scale().sx ?? this.currentScale;
+    const canvasX = clientX - canvasRect.left;
+    const canvasY = clientY - canvasRect.top;
+    return {
+      x: (canvasX - translation.x) / scale,
+      y: (canvasY - translation.y) / scale
+    };
   }
 
   // ==========================================
@@ -287,7 +382,7 @@ private showLinkTools(linkView: dia.LinkView): void {
     });
     
 
-    this.paper.on('blank:pointerdown', () => {
+    this.paper.on('blank:pointerdown', (evt: any) => {
       
       this.clearTools(); 
       this.selectedElementId = null;
@@ -299,7 +394,56 @@ private showLinkTools(linkView: dia.LinkView): void {
       this.isRenaming = false;
       this.clearSelection();
       this.refreshView();
+      this.startCanvasPanning(evt as MouseEvent);
     });
+
+    this.paper.on('blank:pointerup', () => {
+      this.stopCanvasPanning();
+    });
+  }
+
+  private startCanvasPanning(event: MouseEvent): void {
+    if (event.button !== 0) {
+      return;
+    }
+
+    const translation = this.getPaperTranslation();
+    this.isCanvasPanning = true;
+    this.panStartClientX = event.clientX;
+    this.panStartClientY = event.clientY;
+    this.panStartTranslateX = translation.x;
+    this.panStartTranslateY = translation.y;
+
+    this.canvas.nativeElement.classList.add('canvas-panning');
+    document.addEventListener('mousemove', this.handleCanvasPanning);
+    document.addEventListener('mouseup', this.handleCanvasPanningStop);
+  }
+
+  private readonly handleCanvasPanning = (event: MouseEvent): void => {
+    if (!this.isCanvasPanning) {
+      return;
+    }
+
+    const deltaX = event.clientX - this.panStartClientX;
+    const deltaY = event.clientY - this.panStartClientY;
+
+    // La traslacion final es "traslacion inicial + desplazamiento del mouse".
+    this.paper.translate(this.panStartTranslateX + deltaX, this.panStartTranslateY + deltaY);
+  };
+
+  private readonly handleCanvasPanningStop = (): void => {
+    this.stopCanvasPanning();
+  };
+
+  private stopCanvasPanning(): void {
+    this.isCanvasPanning = false;
+    this.canvas?.nativeElement?.classList.remove('canvas-panning');
+    document.removeEventListener('mousemove', this.handleCanvasPanning);
+    document.removeEventListener('mouseup', this.handleCanvasPanningStop);
+  }
+
+  private clamp(value: number, min: number, max: number): number {
+    return Math.max(min, Math.min(value, max));
   }
 
   private registerGraphEvents(): void {
@@ -593,9 +737,8 @@ private showLinkTools(linkView: dia.LinkView): void {
         upEvent.clientY <= paperRect.bottom &&
         this.draggingNodeType
       ) {
-        const offsetX = upEvent.clientX - paperRect.left;
-        const offsetY = upEvent.clientY - paperRect.top;
-        this.addNode(this.draggingNodeType, label, offsetX, offsetY);
+        const paperPoint = this.mapClientToPaper(upEvent.clientX, upEvent.clientY);
+        this.addNode(this.draggingNodeType, label, paperPoint.x, paperPoint.y);
       }
 
       this.draggingNodeType = null;
@@ -631,10 +774,10 @@ private showLinkTools(linkView: dia.LinkView): void {
       return;
     }
 
-    const canvasRect = this.canvas.nativeElement.getBoundingClientRect();
     const nodeSize = this.diagramCanvasService.getNodeSize(nodeType);
-    const x = event.clientX - canvasRect.left - nodeSize.width / 2;
-    const y = event.clientY - canvasRect.top - nodeSize.height / 2;
+    const paperPoint = this.mapClientToPaper(event.clientX, event.clientY);
+    const x = paperPoint.x - nodeSize.width / 2;
+    const y = paperPoint.y - nodeSize.height / 2;
     this.addNode(nodeType, label, x, y);
   }
 
@@ -1361,22 +1504,25 @@ private showLinkTools(linkView: dia.LinkView): void {
           }
         );
 
+        const currentGraph = this.diagramCanvasService.getPersistedGraphJSON(this.graph);
+        const resolvedDiagram = this.resolveCopilotDiagram(text, currentGraph, apply.diagram);
+
         const updatedPolicy: PolicyPayload = {
           id: this.selectedPolicyId ?? '',
           name: this.policyName || 'Politica',
           description: '',
-          diagramJson: JSON.stringify(apply.diagram),
+          diagramJson: JSON.stringify(resolvedDiagram),
           lanes: this.lanes
         };
         this.applyPolicy(updatedPolicy);
         if (this.selectedPolicyId) {
           await this.policyDataService.updatePolicyDiagram(
             this.selectedPolicyId,
-            JSON.stringify(apply.diagram),
+            JSON.stringify(resolvedDiagram),
             this.lanes
           );
         }
-        this.broadcastFullSync(apply.diagram as Record<string, unknown>, this.lanes);
+        this.broadcastFullSync(resolvedDiagram as Record<string, unknown>, this.lanes);
 
         const warnings = apply.warnings?.length ? ` | Advertencias: ${apply.warnings.join(' | ')}` : '';
         this.copilotMessages = [
@@ -1437,4 +1583,67 @@ private showLinkTools(linkView: dia.LinkView): void {
     const normalized = text.toLowerCase();
     return /(agrega|añade|anade|crea|modifica|cambia|elimina|borra|conecta|desconecta|mueve|renombra|actualiza)/.test(normalized);
   }
+
+  private resolveCopilotDiagram(
+    instruction: string,
+    currentDiagram: dia.Graph.JSON,
+    appliedDiagram: Record<string, unknown>
+  ): dia.Graph.JSON {
+    const nextDiagram = this.asGraphJson(appliedDiagram);
+    if (!nextDiagram.cells.length) {
+      return currentDiagram;
+    }
+
+    if (this.isDestructiveIntent(instruction)) {
+      return nextDiagram;
+    }
+
+    return this.mergeGraphCells(currentDiagram, nextDiagram);
+  }
+
+  private asGraphJson(diagram: Record<string, unknown> | null | undefined): dia.Graph.JSON {
+    if (!diagram || !Array.isArray((diagram as { cells?: unknown }).cells)) {
+      return { cells: [] };
+    }
+    return diagram as dia.Graph.JSON;
+  }
+
+  private mergeGraphCells(base: dia.Graph.JSON, patch: dia.Graph.JSON): dia.Graph.JSON {
+    const baseCells = Array.isArray(base.cells) ? [...base.cells] : [];
+    const patchCells = Array.isArray(patch.cells) ? [...patch.cells] : [];
+    const mergedById = new Map<string, any>();
+    const mergedOrder: string[] = [];
+
+    for (const cell of baseCells) {
+      const id = String((cell as any)?.id ?? '');
+      if (!id) {
+        continue;
+      }
+      mergedById.set(id, cell);
+      mergedOrder.push(id);
+    }
+
+    for (const cell of patchCells) {
+      const id = String((cell as any)?.id ?? '');
+      if (!id) {
+        continue;
+      }
+      mergedById.set(id, cell);
+      if (!mergedOrder.includes(id)) {
+        mergedOrder.push(id);
+      }
+    }
+
+    return {
+      ...base,
+      ...patch,
+      cells: mergedOrder.map((id) => mergedById.get(id)).filter((cell): cell is any => !!cell)
+    };
+  }
+
+  private isDestructiveIntent(text: string): boolean {
+    const normalized = (text ?? '').toLowerCase();
+    return /(elimina|borra|quita|remueve|desconecta|limpia)/.test(normalized);
+  }
 }
+
