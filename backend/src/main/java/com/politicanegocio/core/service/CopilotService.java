@@ -1,5 +1,6 @@
 package com.politicanegocio.core.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.politicanegocio.core.dto.CopilotApplyRequestDto;
 import com.politicanegocio.core.dto.CopilotApplyResponseDto;
 import com.politicanegocio.core.dto.CopilotConversationDto;
@@ -36,6 +37,7 @@ public class CopilotService {
     private final RestClient restClient;
     private final String aiEngineBaseUrl;
     private final CopilotConversationRepository copilotConversationRepository;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public CopilotService(
             @Value("${app.ai-engine.base-url:http://127.0.0.1:8010}") String aiEngineBaseUrl,
@@ -46,7 +48,7 @@ public class CopilotService {
 
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(20000);
-        factory.setReadTimeout(120000);
+        factory.setReadTimeout(300000);
 
         this.restClient = RestClient.builder()
                 .baseUrl(aiEngineBaseUrl)
@@ -95,12 +97,14 @@ public class CopilotService {
             }
             // -------------------------------------------------------------
 
-            CopilotResponseDto aiResponse = restClient.post()
+            String aiRawResponse = restClient.post()
                     .uri("/api/ai/copilot-chat")
                     .header("X-Request-Id", requestId)
                     .body(aiPayload)
                     .retrieve()
-                    .body(CopilotResponseDto.class);
+                    .body(String.class);
+
+            CopilotResponseDto aiResponse = parseChatResponse(aiRawResponse, requestId);
 
             if (aiResponse == null) {
                 throw new ResponseStatusException(
@@ -134,6 +138,7 @@ public class CopilotService {
             String rootCause = exception.getMostSpecificCause() != null
                     ? exception.getMostSpecificCause().toString()
                     : exception.toString();
+            boolean timedOut = rootCause.toLowerCase().contains("timed out");
 
             log.error(
                     "Copilot gateway connectivity error requestId={} aiBaseUrl={} rootCause={}",
@@ -144,8 +149,9 @@ public class CopilotService {
             );
 
             throw new ResponseStatusException(
-                    HttpStatus.BAD_GATEWAY,
-                    "No se pudo conectar con el microservicio IA. requestId=" + requestId
+                    timedOut ? HttpStatus.GATEWAY_TIMEOUT : HttpStatus.BAD_GATEWAY,
+                    (timedOut ? "Timeout esperando respuesta del microservicio IA. " : "No se pudo conectar con el microservicio IA. ")
+                            + "requestId=" + requestId
                             + " aiBaseUrl=" + aiEngineBaseUrl
                             + " rootCause=" + rootCause,
                     exception
@@ -245,12 +251,14 @@ public class CopilotService {
         // ----------------------------------------------------------------------------------
 
         try {
-            CopilotApplyResponseDto response = restClient.post()
+            String aiRawResponse = restClient.post()
                     .uri("/api/v1/agent/diagram") // <-- IMPORTANTE: Verifica que esta sea la URL correcta de tu Python
                     .header("X-Request-Id", requestId)
                     .body(payload)
                     .retrieve()
-                    .body(CopilotApplyResponseDto.class);
+                    .body(String.class);
+
+            CopilotApplyResponseDto response = parseApplyResponse(aiRawResponse, requestId);
 
             if (response == null || response.diagram() == null) {
                 throw new ResponseStatusException(
@@ -263,9 +271,11 @@ public class CopilotService {
             String rootCause = exception.getMostSpecificCause() != null
                     ? exception.getMostSpecificCause().toString()
                     : exception.toString();
+            boolean timedOut = rootCause.toLowerCase().contains("timed out");
             throw new ResponseStatusException(
-                    HttpStatus.BAD_GATEWAY,
-                    "No se pudo conectar con el microservicio IA (apply). requestId=" + requestId
+                    timedOut ? HttpStatus.GATEWAY_TIMEOUT : HttpStatus.BAD_GATEWAY,
+                    (timedOut ? "Timeout esperando respuesta del microservicio IA (apply). " : "No se pudo conectar con el microservicio IA (apply). ")
+                            + "requestId=" + requestId
                             + " rootCause=" + rootCause,
                     exception
             );
@@ -394,5 +404,45 @@ public class CopilotService {
                 conversation.getUpdatedAt(),
                 messages
         );
+    }
+
+    private CopilotResponseDto parseChatResponse(String rawBody, String requestId) {
+        String payload = rawBody == null ? "" : rawBody.trim();
+        if (payload.isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_GATEWAY,
+                    "El microservicio IA devolvio respuesta vacia. requestId=" + requestId
+            );
+        }
+        try {
+            return objectMapper.readValue(payload, CopilotResponseDto.class);
+        } catch (Exception exception) {
+            String preview = payload.length() > 1000 ? payload.substring(0, 1000) + "..." : payload;
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_GATEWAY,
+                    "Respuesta invalida del microservicio IA (chat). requestId=" + requestId + " body=" + preview,
+                    exception
+            );
+        }
+    }
+
+    private CopilotApplyResponseDto parseApplyResponse(String rawBody, String requestId) {
+        String payload = rawBody == null ? "" : rawBody.trim();
+        if (payload.isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_GATEWAY,
+                    "El microservicio IA no devolvio respuesta (apply). requestId=" + requestId
+            );
+        }
+        try {
+            return objectMapper.readValue(payload, CopilotApplyResponseDto.class);
+        } catch (Exception exception) {
+            String preview = payload.length() > 1000 ? payload.substring(0, 1000) + "..." : payload;
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_GATEWAY,
+                    "Respuesta invalida del microservicio IA (apply). requestId=" + requestId + " body=" + preview,
+                    exception
+            );
+        }
     }
 }

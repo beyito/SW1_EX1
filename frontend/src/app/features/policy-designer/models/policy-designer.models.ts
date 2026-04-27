@@ -10,7 +10,7 @@ export interface CompanyArea {
   color: string;
 }
 
-export type Lane = CompanyArea & { x: number; width?: number };
+export type Lane = CompanyArea & { x: number; width?: number; height?: number };
 
 export interface Attachment {
   id: string;

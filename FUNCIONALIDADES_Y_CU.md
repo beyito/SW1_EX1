@@ -1,204 +1,252 @@
-# Funcionalidades y Casos de Uso (CU)
+# Especificacion de Casos de Uso (CU) para UML
 
-## 1. Autenticacion y sesion
+## 1. Alcance
+Este documento define los casos de uso funcionales del sistema BPMN colaborativo para derivar diagramas UML (Use Case, Activity, Sequence).
 
-### CU-01 Login Web
-- Actor: `SOFTWARE_ADMIN`, `COMPANY_ADMIN`, `FUNCTIONARY`.
-- Entrada: usuario + password.
-- Endpoint: `POST /api/auth/login`.
-- Frontend: `AuthService.login`.
-- Resultado: token + perfil (`roles`, `company`, `area`, `laneId`).
+## 2. Actores
+- `Software Admin`: administra empresas y administradores de empresa.
+- `Company Admin`: diseña politicas BPMN, administra areas/carriles y usuarios de su empresa.
+- `Functionary`: ejecuta tareas operativas de su carril.
+- `Client`: inicia tramites y atiende tareas de su carril (principalmente mobile).
+- `Copilot IA`: asistente que sugiere o aplica cambios al diagrama.
+- `Sistema BPMN`: backend + motor de workflow + persistencia.
 
-### CU-02 Login Mobile Cliente
-- Actor: `CLIENT`.
-- Endpoint: `POST /api/auth/mobile/login`.
-- Regla: login de cliente separado del flujo web.
+## 3. Matriz CU resumida
+- `CU-01` Iniciar sesion web.
+- `CU-02` Iniciar sesion mobile cliente.
+- `CU-03` Gestionar empresas (Software Admin).
+- `CU-04` Gestionar areas/carriles (Company Admin).
+- `CU-05` Crear politica BPMN.
+- `CU-06` Editar diagrama BPMN manualmente.
+- `CU-07` Editar diagrama con Copilot IA.
+- `CU-08` Guardar politica y sincronizar colaboracion.
+- `CU-09` Iniciar proceso desde una politica.
+- `CU-10` Tomar/iniciar tarea.
+- `CU-11` Completar tarea y enrutar decision.
+- `CU-12` Gestionar adjuntos de formulario.
+- `CU-13` Consultar bandeja y detalle de tareas.
 
-### CU-03 Perfil autenticado
-- Endpoint: `GET /api/auth/me`.
-- Uso: refrescar perfil de sesion y lane operativo.
+## 4. Casos de uso detallados
 
-## 2. Administracion de empresa, areas y usuarios
+### CU-01 Iniciar sesion web
+- Objetivo: autenticar usuario interno.
+- Actores: `Software Admin`, `Company Admin`, `Functionary`.
+- Disparador: usuario envia credenciales.
+- Precondiciones: usuario existe y esta activo.
+- Flujo principal:
+1. Actor ingresa usuario y contrasena.
+2. Frontend envia `POST /api/auth/login`.
+3. Backend valida credenciales.
+4. Backend devuelve token y perfil.
+5. Frontend guarda sesion y redirige.
+- Flujos alternos:
+1. Credenciales invalidas: backend responde error y no crea sesion.
+2. Rol no permitido en web: se rechaza acceso.
+- Postcondiciones: sesion autenticada en cliente web.
+- Servicios: `AuthService.login`, `AuthController.login`.
 
-### CU-04 Gestion de empresas
-- Actor: `SOFTWARE_ADMIN`.
-- Endpoints:
-  - `POST /api/admin/companies`
-  - `GET /api/admin/companies`
+### CU-02 Iniciar sesion mobile cliente
+- Objetivo: autenticar cliente en app mobile.
+- Actores: `Client`.
+- Disparador: cliente envia credenciales en mobile.
+- Precondiciones: usuario con rol cliente.
+- Flujo principal:
+1. Mobile envia `POST /api/auth/mobile/login`.
+2. Backend valida rol y credenciales.
+3. Backend devuelve token/perfil.
+4. Mobile habilita dashboard de tramites.
+- Flujos alternos:
+1. Usuario no cliente: acceso denegado.
+- Postcondiciones: sesion cliente activa.
+- Servicios: `AuthController.loginMobile`.
 
-### CU-05 Gestion de company-admins
-- Actor: `SOFTWARE_ADMIN`.
-- Endpoints:
-  - `POST /api/admin/company-admins`
-  - `GET /api/admin/company-admins`
-  - `PUT /api/admin/company-admins/{userId}`
-  - `DELETE /api/admin/company-admins/{userId}`
+### CU-03 Gestionar empresas
+- Objetivo: alta/listado de empresas.
+- Actores: `Software Admin`.
+- Precondiciones: sesion con rol `SOFTWARE_ADMIN`.
+- Flujo principal:
+1. Actor crea empresa (`POST /api/admin/companies`).
+2. Sistema persiste empresa.
+3. Actor consulta listado (`GET /api/admin/companies`).
+- Flujos alternos:
+1. Rol insuficiente: 403.
+- Postcondiciones: empresa disponible para administracion.
+- Servicios: `AdminController`, `AdminService`.
 
-### CU-06 Gestion de areas (swimlanes de negocio)
-- Actor: `COMPANY_ADMIN`.
-- Endpoints:
-  - `POST /api/admin/areas`
-  - `GET /api/admin/areas`
-  - `PUT /api/admin/areas/{areaId}`
-  - `DELETE /api/admin/areas/{areaId}`
-- Uso en disenador: alimenta lista de carriles disponibles.
+### CU-04 Gestionar areas/carriles
+- Objetivo: administrar areas que mapean a carriles de politicas.
+- Actores: `Company Admin`.
+- Precondiciones: sesion valida en empresa.
+- Flujo principal:
+1. Actor crea/edita/elimina area (`/api/admin/areas`).
+2. Frontend del diseñador carga areas (`CompanyAreaService.getCompanyAreas`).
+3. Areas se usan como base de carriles en politicas.
+- Flujos alternos:
+1. Nombre duplicado o invalido: error de validacion.
+- Postcondiciones: catalogo de areas actualizado.
 
-### CU-07 Gestion de functionaries
-- Actor: `COMPANY_ADMIN`.
-- Endpoints:
-  - `POST /api/admin/functionaries`
-  - `GET /api/admin/functionaries`
-  - `PUT /api/admin/functionaries/{userId}`
-  - `DELETE /api/admin/functionaries/{userId}`
+### CU-05 Crear politica BPMN
+- Objetivo: crear contenedor de politica.
+- Actores: `Company Admin`.
+- Precondiciones: existen areas de empresa.
+- Flujo principal:
+1. Actor crea politica por GraphQL `createPolicy`.
+2. Sistema crea politica con `diagramJson` inicial y metadatos.
+3. Frontend abre diseñador de la nueva politica.
+- Postcondiciones: politica creada en estado editable.
+- Servicios: `PolicyGraphQLController.createPolicy`, `PolicyService.createPolicy`.
 
-### CU-08 Gestion de clientes
-- Actor: `COMPANY_ADMIN`.
-- Endpoints:
-  - `POST /api/admin/clients`
-  - `GET /api/admin/clients`
-  - `PUT /api/admin/clients/{userId}`
-  - `DELETE /api/admin/clients/{userId}`
+### CU-06 Editar diagrama BPMN manualmente
+- Objetivo: construir flujo con nodos, enlaces y carriles.
+- Actores: `Company Admin`.
+- Precondiciones: politica cargada.
+- Flujo principal:
+1. Actor agrega carriles (areas).
+2. Actor agrega nodos (`START`, `TASK`, `DECISION`, `FORK`, `JOIN`, `END`).
+3. Actor conecta nodos con enlaces.
+4. Actor define metadata de tareas y condiciones de decisiones.
+5. Sistema autosave local + persistencia remota.
+- Flujos alternos:
+1. Enlace duplicado: se rechaza.
+2. Nodo fuera de limites: se clampa posicion.
+- Postcondiciones: diagrama consistente persistido.
+- Servicios: `DiagramCanvasService`, `PolicyDesignerComponent`.
 
-## 3. Disenador BPMN (GraphQL + JointJS + tiempo real)
+### CU-07 Editar diagrama con Copilot IA
+- Objetivo: modificar diagrama por lenguaje natural.
+- Actores: `Company Admin`, `Copilot IA`.
+- Precondiciones: politica abierta y sesion activa.
+- Flujo principal:
+1. Actor envia instruccion al chat Copilot.
+2. Frontend envia snapshot actual + lanes.
+3. Backend gateway reenvia a microservicio IA.
+4. IA devuelve `diagram` y opcionalmente `lanes`.
+5. Frontend fusiona (si no destructivo).
+6. Frontend normaliza visual/geometricamente con `normalizeDiagramForDesigner`.
+7. Frontend aplica, guarda y publica `full-sync`.
+- Flujos alternos:
+1. Timeout IA: gateway devuelve 504.
+2. Respuesta invalida IA: gateway devuelve error controlado.
+- Postcondiciones: diagrama actualizado sin romper estilo/carriles.
+- Servicios:
+  - Front: `sendToCopilot`, `resolveCopilotDiagram`.
+  - Back: `CopilotService.chat/apply`.
+  - IA: `DiagramAgentService.process`.
 
-### CU-09 Crear politica
-- Actor: `COMPANY_ADMIN`.
-- GraphQL: `createPolicy(name, description)`.
-- Backend: `PolicyService.createPolicy`.
+### CU-08 Guardar politica y sincronizar colaboracion
+- Objetivo: persistir cambios y propagar en tiempo real.
+- Actores: `Company Admin`, `Sistema BPMN`.
+- Precondiciones: politica seleccionada.
+- Flujo principal:
+1. Frontend serializa grafo (sin fondos de carril).
+2. Frontend envia GraphQL `updatePolicyGraph`.
+3. Backend recalcula `laneId` por posicion.
+4. Backend guarda `diagramJson` y `lanes` (`x`,`width`,`height`).
+5. Frontend emite eventos STOMP.
+6. Otros clientes aplican evento remoto.
+- Flujos alternos:
+1. Conflicto visual remoto: se usa `full-sync`.
+- Postcondiciones: todos los clientes convergen al mismo estado.
 
-### CU-10 Consultar politicas
-- GraphQL:
-  - `getAllPolicies`
-  - `getPolicyById(id)` con `diagramJson` y `lanes{x,width,...}`.
-- Frontend: `PolicyDataService.getAllPolicies`, `getPolicyById`.
+### CU-09 Iniciar proceso desde politica
+- Objetivo: crear instancia de proceso.
+- Actores: `Functionary`, `Client`.
+- Precondiciones:
+1. Politica activa.
+2. Actor autorizado para `startLaneId`.
+- Flujo principal:
+1. Actor solicita inicio (`POST /api/execution/process/start`).
+2. Backend valida permiso por lane.
+3. Crea `ProcessInstance`.
+4. Motor calcula primeros nodos y crea tareas pendientes.
+- Flujos alternos:
+1. Lane no autorizado: se rechaza inicio.
+- Postcondiciones: proceso activo con tareas iniciales.
 
-### CU-11 Edicion de diagrama y auto-save
-- Actor: `COMPANY_ADMIN`.
-- GraphQL: `updatePolicyGraph(policyId, diagramJson, lanes)`.
-- Frontend:
-  - `DiagramCanvasService.getPersistedGraphJSON`
-  - `PolicyDesignerComponent.persistPolicyGraph`
-- Backend:
-  - recalculo de `laneId` por nodo segun posicion X y carriles.
-  - persistencia de `lanes` con `x` y `width`.
+### CU-10 Tomar/iniciar tarea
+- Objetivo: mover tarea de `PENDING` a `IN_PROGRESS`.
+- Actores: `Functionary`, `Client`.
+- Precondiciones: tarea visible y autorizada.
+- Flujo principal:
+1. Actor ejecuta `take/start`.
+2. Backend valida acceso por lane/asignacion.
+3. Backend actualiza estado y `assignedTo`.
+- Postcondiciones: tarea en progreso.
 
-### CU-12 Canvas enterprise (responsive + zoom + panning)
-- Funcionalidades:
-  - `ResizeObserver` para ajustar `paper.setDimensions`.
-  - Zoom con rueda y foco en cursor.
-  - Panning del lienzo en area vacia.
-- Metodos:
-  - `initializeResponsiveCanvas`
-  - `onCanvasWheel`
-  - `startCanvasPanning`, `stopCanvasPanning`.
+### CU-11 Completar tarea y enrutar decision
+- Objetivo: completar tarea y avanzar flujo.
+- Actores: `Functionary`, `Client`, `Sistema BPMN`.
+- Precondiciones: tarea en `IN_PROGRESS`.
+- Flujo principal:
+1. Actor envia formulario (`complete`).
+2. Backend valida obligatorios.
+3. Backend parsea variables de ruteo (ej. `_decisionTomada`).
+4. `WorkflowEngine` evalua enlaces.
+5. Se crean siguientes tareas o se completa proceso.
+- Flujos alternos:
+1. Formulario invalido: error de validacion.
+2. Decision sin match: usa rama default si existe.
+- Postcondiciones: flujo avanza segun reglas BPMN.
 
-### CU-13 Lanes dinamicos y sincronizados
-- Crear/eliminar carriles desde UI y por comandos IA.
-- Redimensionar carriles y persistir geometria exacta (`x`, `width`).
-- Sincronizacion cross-browser:
-  - eventos incrementales para celdas.
-  - `full-sync` para layout de carriles.
+### CU-12 Gestionar adjuntos de formulario
+- Objetivo: subir y asociar archivos a formularios.
+- Actores: `Company Admin`, `Functionary`, `Client`.
+- Flujo principal:
+1. Actor selecciona archivo.
+2. Frontend sube a `POST /api/files/upload`.
+3. Backend guarda en S3 y retorna metadatos.
+4. Frontend referencia adjunto en `taskForm`.
+- Postcondiciones: adjunto disponible por URL.
 
-### CU-14 Edicion de nodos y enlaces
-- Nodos:
-  - tipos: `START`, `TASK`, `DECISION`, `FORK`, `JOIN`, `SYNCHRONIZATION`, `END`.
-  - metadata: formularios, expresiones.
-- Enlaces:
-  - multiples conexiones permitidas.
-  - condicion SpEL desde `DECISION`.
-  - panel de propiedades de enlace para etiqueta y condicion.
+### CU-13 Consultar bandeja y detalle de tareas
+- Objetivo: ver pendientes e historial por proceso.
+- Actores: `Functionary`, `Client`.
+- Flujo principal:
+1. Actor consulta `my-tasks` / `my-processes/tasks`.
+2. Actor abre detalle de tarea (`/tasks/{id}` o GraphQL).
+3. Sistema devuelve formulario, estado y contexto de proceso.
+- Postcondiciones: actor informado para ejecutar tarea.
 
-### CU-15 Copilot BPMN (chat + apply)
-- Chat:
-  - mensaje contextual con snapshot del diagrama.
-  - historial por politica/usuario.
-- Apply:
-  - genera cambios estructurales en JSON de diagrama.
-  - fusion no destructiva cuando corresponde.
-  - soporte para crear `FORK`, `JOIN` y sincronizacion.
+## 5. Relaciones UML entre casos de uso
+- `CU-07 Editar con Copilot` <<include>> `CU-08 Guardar y sincronizar`.
+- `CU-06 Editar manual` <<include>> `CU-08 Guardar y sincronizar`.
+- `CU-11 Completar tarea` <<include>> evaluacion de decision SpEL.
+- `CU-10 Tomar tarea` <<extend>> `CU-13 Bandeja de tareas`.
+- `CU-09 Iniciar proceso` <<include>> validacion de lane de inicio.
 
-## 4. Ejecucion de procesos y tareas
+## 6. Frontera del sistema (para Use Case Diagram)
+- Dentro del sistema:
+  - Auth, Admin, Diseñador BPMN, Copilot Gateway, Motor Workflow, Colaboracion STOMP, S3 Upload.
+- Fuera del sistema:
+  - Usuario humano (actores).
+  - Servicio IA (si lo modelas como actor externo en un diagrama de contexto).
+  - AWS S3.
 
-### CU-16 Iniciar proceso
-- Endpoint: `POST /api/execution/process/start`.
-- Regla: solo usuarios cuyo lane coincide con `startLaneId` de la politica.
-- Servicio: `ProcessExecutionService.startProcess`.
+## 7. Prompt maestro para generar UML
+Usa este prompt con otra IA cuando quieras diagramas UML consistentes:
 
-### CU-17 Tomar/iniciar tarea
-- Endpoints:
-  - `POST /api/execution/tasks/{taskId}/take`
-  - `POST /api/execution/tasks/{taskId}/start`
-- Servicio: `ProcessExecutionService.startTask`.
+```text
+Actua como analista UML senior. Con base en los siguientes casos de uso del sistema BPMN colaborativo:
+[PEGAR SECCION 4 COMPLETA]
 
-### CU-18 Completar tarea
-- Endpoint: `POST /api/execution/tasks/{taskId}/complete`.
-- Servicio: `ProcessExecutionService.completeTask`.
-- Reglas:
-  - valida obligatorios del formulario dinamico.
-  - parsea variables para enrutamiento (`_decisionTomada`).
-  - avanza flujo con `DECISION`, `FORK`, `JOIN`, `END`.
+Genera:
+1) Un diagrama de Casos de Uso UML (actores + relaciones include/extend).
+2) Un diagrama de Actividad para CU-07 (Editar diagrama con Copilot IA).
+3) Un diagrama de Secuencia para CU-11 (Completar tarea y enrutar decision).
 
-### CU-19 Bandeja y detalle
-- Endpoints:
-  - `GET /api/execution/my-tasks`
-  - `GET /api/execution/my-processes/tasks`
-  - `GET /api/execution/tasks/{taskId}`
-- GraphQL equivalente:
-  - `myTasks`
-  - `getTaskDetail(taskId)`
-  - `takeTask`, `completeTask`.
+Reglas:
+- Usa nomenclatura exacta de actores: Software Admin, Company Admin, Functionary, Client, Copilot IA, Sistema BPMN.
+- Respeta precondiciones, flujos alternos y postcondiciones.
+- Refleja endpoints/servicios cuando aplique.
+- Entrega en PlantUML, separado por bloques.
+- No inventes actores ni pasos fuera de los casos definidos.
+```
 
-### CU-20 Politicas iniciables por usuario
-- Endpoint: `GET /api/execution/startable-policies`.
-- Servicio: `PolicyService.getStartablePoliciesForUser`.
-
-## 5. Adjuntos y formularios
-
-### CU-21 Subir archivo
-- Endpoint: `POST /api/files/upload`.
-- Frontend: `FileService.uploadAttachment`.
-- Backend: `S3Service.upload`.
-
-### CU-22 Formularios de tarea
-- Metadatos por nodo `TASK`: `taskForm.title`, `description`, `fields`.
-- Campo de pregunta:
-  - `requiresAttachment` y `attachmentLabel` para indicar adjunto requerido.
-- Nota funcional vigente:
-  - se conserva la marca de adjunto requerido por pregunta.
-  - el adjunto directo del nodo puede estar deshabilitado en UI segun configuracion actual.
-
-## 6. Metricas
-
-### CU-23 Metricas por politica
-- Endpoint: `GET /api/metrics/policy/{policyId}`.
-- Servicio: `MetricsService.getPolicyMetrics`.
-- Rol: `COMPANY_ADMIN` o `SOFTWARE_ADMIN`.
-
-## 7. Colaboracion en tiempo real
-
-### CU-24 Edicion simultanea de diagrama
-- STOMP:
-  - publica: `/app/policy/{policyId}/change`
-  - suscribe: `/topic/policy.{policyId}`
-- Servicio frontend: `WebSocketService`.
-- Controlador backend: `DesignerSocketController.handlePolicyChange`.
-
-## 8. Catalogo corto de metodos por modulo
-
-### Frontend (policy-designer)
-- `PolicyDataService`: `getAllPolicies`, `getPolicyById`, `createPolicy`, `updatePolicyDiagram`, `getTaskExecutionOrder`.
-- `DiagramCanvasService`: `createGraph`, `createPaper`, `createShape`, `createLink`, `renderLaneBackgrounds`, `renderPolicy`.
-- `PolicyDesignerComponent`:
-  - carga/sincronizacion: `loadPolicyFromRoute`, `connectToPolicyTopic`, `handleRemoteEvent`.
-  - lanes: `addLane`, `removeLane`, `syncLanesFromCanvas`.
-  - copilot: `sendToCopilot`, `applyLaneCommandsFromText`, `resolveCopilotDiagram`.
-
-### Backend
-- `PolicyService`: `createPolicy`, `getPolicyById`, `updatePolicyGraph`, `getTaskExecutionOrder`.
-- `ProcessExecutionService`: `startProcess`, `completeTask`, `startTask`, `getMyTasks`, `getTaskDetail`.
-- `WorkflowEngine`: `getNextNodes`, `getNodeName`, `getIncomingNodeIds`.
-- `CopilotService`: `chat`, `getConversationHistory`, `apply`.
-
-### IA
-- `DiagramAgentService.process`.
-- `diagram_tools.sanitize_diagram`.
+## 8. Prompt corto por CU (plantilla)
+```text
+Genera UML para el caso de uso [CU-XX].
+Incluye: actores, precondiciones, flujo principal (paso a paso), alternos, postcondiciones.
+Salida: PlantUML (Use Case + Activity + Sequence).
+Contexto del sistema:
+[PEGAR CU-XX]
+```

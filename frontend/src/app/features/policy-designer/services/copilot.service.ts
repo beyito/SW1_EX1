@@ -12,7 +12,15 @@ export interface CopilotApplyResponse {
   changes: string[];
   warnings: string[];
   diagram: Record<string, unknown>;
-  lanes?: any[];
+  lanes?: Array<{
+    id?: string;
+    _id?: string;
+    name?: string;
+    color?: string;
+    x?: number;
+    width?: number;
+    height?: number;
+  }>;
 }
 
 export interface CopilotConversationMessage {

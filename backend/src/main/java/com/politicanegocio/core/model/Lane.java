@@ -9,4 +9,5 @@ public class Lane {
     private String color;
     private Double x;
     private Double width;
+    private Double height;
 }

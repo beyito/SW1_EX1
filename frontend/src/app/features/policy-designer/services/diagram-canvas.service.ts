@@ -261,7 +261,7 @@ export class DiagramCanvasService {
     }
 
     link.router('orthogonal', { padding: 30 });
-    // link.connector('straight');
+    link.connector('straight', { cornerType: 'line' });
     return link;
   }
 
@@ -277,13 +277,14 @@ public renderLaneBackgrounds(graph: dia.Graph, lanes: Lane[]): void {
 
     normalizedLanes.forEach((lane) => {
       const laneWidth = this.getLaneWidth(lane, normalizedLanes.length);
+      const laneHeight = this.getLaneHeight(lane);
       const positionX = (lane.x ?? laneWidth / 2) - laneWidth / 2;
       
       // 🚩 Usamos HeaderedRectangle: Es UN SOLO elemento indivisible
       const laneShape = new shapes.standard.HeaderedRectangle({
         z: -10, // Se queda al fondo
         position: { x: positionX, y: 0 },
-        size: { width: laneWidth, height: this.canvasHeight },
+        size: { width: laneWidth, height: laneHeight },
         isLaneBackground: true,
         attrs: {
           // El cuerpo de la calle
@@ -350,6 +351,28 @@ public renderLaneBackgrounds(graph: dia.Graph, lanes: Lane[]): void {
     };
   }
 
+  public normalizeDiagramForDesigner(diagram: dia.Graph.JSON, lanes: Lane[]): dia.Graph.JSON {
+    const sourceCells = Array.isArray(diagram.cells) ? diagram.cells : [];
+    const normalizedLanes = this.normalizeLaneGeometry(lanes);
+    const normalizedCells = sourceCells
+      .map((cell) => {
+        const candidate = { ...(cell as Record<string, unknown>) } as any;
+        if (candidate.isLaneBackground) {
+          return null;
+        }
+        if (candidate.type === 'standard.Link') {
+          return this.normalizeLinkCell(candidate);
+        }
+        return this.normalizeElementCell(candidate, normalizedLanes);
+      })
+      .filter((cell): cell is any => !!cell);
+
+    return {
+      ...diagram,
+      cells: normalizedCells
+    };
+  }
+
   public hasExistingLink(graph: dia.Graph, sourceId: dia.Cell.ID, targetId: dia.Cell.ID): boolean {
     return graph.getLinks().some((link) => {
       const currentSourceId = link.get('source')?.id;
@@ -389,7 +412,8 @@ public renderLaneBackgrounds(graph: dia.Graph, lanes: Lane[]): void {
     return lanes.map((lane, index) => ({
       ...lane,
       x: index * laneWidth + laneWidth / 2,
-      width: laneWidth
+      width: laneWidth,
+      height: lane.height && lane.height > 0 ? lane.height : this.canvasHeight
     }));
   }
 
@@ -475,6 +499,231 @@ public renderLaneBackgrounds(graph: dia.Graph, lanes: Lane[]): void {
     }
   }
 
+  private normalizeElementCell(cell: any, lanes: Lane[]): any {
+    const nodeType = String(cell.nodeType ?? 'TASK').toUpperCase();
+    const labelText = String(cell?.attrs?.label?.text ?? 'Nodo');
+    const size = this.getNodeSize(nodeType);
+    const attrs = this.buildNodeAttrs(nodeType, labelText);
+
+    let laneId = String(cell.laneId ?? '').trim();
+    if (!laneId && lanes.length > 0) {
+      const currentX = Number(cell?.position?.x ?? 0) + size.width / 2;
+      laneId = this.getLaneIdByX(lanes, currentX) ?? '';
+    }
+
+    const normalizedPosition = this.normalizeNodePosition(
+      cell?.position,
+      size,
+      laneId,
+      lanes
+    );
+
+    const normalized: any = {
+      ...cell,
+      nodeType,
+      type: this.getShapeTypeForNode(nodeType),
+      size,
+      attrs,
+      position: normalizedPosition
+    };
+
+    if (laneId) {
+      normalized.laneId = laneId;
+    }
+    if (nodeType === 'TASK') {
+      normalized.nodeMeta = this.normalizeTaskMeta(normalized.nodeMeta);
+    } else if (nodeType === 'DECISION') {
+      normalized.nodeMeta = this.normalizeDecisionMeta(normalized.nodeMeta);
+    }
+
+    return normalized;
+  }
+
+  private normalizeLinkCell(cell: any): any {
+    const normalized = {
+      ...cell,
+      type: 'standard.Link',
+      z: 0,
+      attrs: {
+        line: {
+          stroke: '#0f172a',
+          strokeWidth: 2,
+          strokeLinecap: 'round',
+          strokeLinejoin: 'round',
+          sourceMarker: null,
+          targetMarker: {
+            type: 'path',
+            d: 'M 10 -5 0 0 10 5 z',
+            fill: '#0f172a',
+            stroke: '#0f172a',
+            'stroke-width': 1
+          }
+        }
+      },
+      router: cell?.router ?? { name: 'orthogonal', args: { padding: 30 } }
+    } as any;
+
+    return normalized;
+  }
+
+  private normalizeNodePosition(
+    position: any,
+    size: { width: number; height: number },
+    laneId: string,
+    lanes: Lane[]
+  ): { x: number; y: number } {
+    const rawX = Number(position?.x ?? 80);
+    const rawY = Number(position?.y ?? 80);
+    let x = Number.isFinite(rawX) ? rawX : 80;
+    let y = Number.isFinite(rawY) ? rawY : 80;
+
+    if (!laneId || lanes.length === 0) {
+      return {
+        x: this.clampNodeX(x, size.width),
+        y: this.clampNodeY(y, size.height)
+      };
+    }
+
+    const lane = lanes.find((item) => item.id === laneId);
+    if (!lane) {
+      return {
+        x: this.clampNodeX(x, size.width),
+        y: this.clampNodeY(y, size.height)
+      };
+    }
+
+    const laneWidth = this.getLaneWidth(lane, lanes.length);
+    const laneHeight = this.getLaneHeight(lane);
+    const centerX = lane.x ?? laneWidth / 2;
+    const laneLeft = centerX - laneWidth / 2;
+    const laneRight = centerX + laneWidth / 2;
+
+    const minX = laneLeft + 10;
+    const maxX = Math.max(minX, laneRight - size.width - 10);
+    const minY = 54;
+    const maxY = Math.max(minY, laneHeight - size.height - 10);
+
+    const defaultLaneX = centerX - size.width / 2;
+    const nextX = Number.isFinite(x) ? x : defaultLaneX;
+
+    return {
+      x: Math.max(minX, Math.min(nextX, maxX)),
+      y: Math.max(minY, Math.min(y, maxY))
+    };
+  }
+
+  private getShapeTypeForNode(nodeType: string): string {
+    switch (nodeType) {
+      case 'START':
+      case 'END':
+        return 'standard.Circle';
+      case 'DECISION':
+        return 'standard.Polygon';
+      case 'TASK':
+      case 'JOIN':
+      case 'FORK':
+      case 'SYNCHRONIZATION':
+      default:
+        return 'standard.Rectangle';
+    }
+  }
+
+  private buildNodeAttrs(nodeType: string, label: string): any {
+    const base = {
+      body: {
+        fill: '#eff6ff',
+        stroke: '#3b82f6',
+        strokeWidth: 2
+      },
+      label: {
+        text: label,
+        fill: '#1e3a8a',
+        fontSize: 14,
+        fontWeight: '600',
+        textWrap: { width: 120, height: -10 }
+      }
+    };
+
+    switch (nodeType) {
+      case 'START':
+        return {
+          ...base,
+          body: { ...base.body, fill: '#d1fae5', stroke: '#10b981' },
+          label: { ...base.label, fill: '#064e3b' }
+        };
+      case 'END':
+        return {
+          ...base,
+          body: { ...base.body, fill: '#fee2e2', stroke: '#ef4444', strokeWidth: 4 },
+          label: { ...base.label, fill: '#7f1d1d' }
+        };
+      case 'DECISION':
+        return {
+          body: {
+            refPoints: '0,60 60,0 120,60 60,120',
+            fill: '#fffbeb',
+            stroke: '#d97706',
+            strokeWidth: 2
+          },
+          label: {
+            ...base.label,
+            fill: '#78350f',
+            textWrap: { width: 80, height: -10 }
+          }
+        };
+      case 'JOIN':
+        return {
+          body: {
+            fill: '#374151',
+            stroke: '#374151',
+            strokeWidth: 2,
+            rx: 0,
+            ry: 0
+          },
+          label: { ...base.label, fill: '#ffffff', fontSize: 12, fontWeight: 'bold' }
+        };
+      case 'FORK':
+      case 'SYNCHRONIZATION':
+        return {
+          body: {
+            fill: '#1f2937',
+            stroke: '#1f2937',
+            strokeWidth: 2,
+            rx: 0,
+            ry: 0
+          },
+          label: { ...base.label, fill: '#ffffff', fontSize: 12, fontWeight: 'bold' }
+        };
+      case 'TASK':
+      default:
+        return {
+          ...base,
+          body: { ...base.body, rx: 8, ry: 8, fill: '#eff6ff', stroke: '#3b82f6' },
+          label: { ...base.label, fill: '#1e3a8a', textWrap: { width: 120, height: -10 } }
+        };
+    }
+  }
+
+  private normalizeTaskMeta(meta: any): any {
+    const taskForm = meta?.taskForm ?? {};
+    return {
+      ...meta,
+      taskForm: {
+        title: taskForm?.title ?? '',
+        description: taskForm?.description ?? '',
+        fields: Array.isArray(taskForm?.fields) ? taskForm.fields : [],
+        attachments: Array.isArray(taskForm?.attachments) ? taskForm.attachments : []
+      }
+    };
+  }
+
+  private normalizeDecisionMeta(meta: any): any {
+    return {
+      ...meta,
+      decisionExpression: meta?.decisionExpression ?? ''
+    };
+  }
+
   private escapeSingleQuotes(value: string): string {
     return value.replace(/'/g, "\\'");
   }
@@ -494,6 +743,10 @@ public renderLaneBackgrounds(graph: dia.Graph, lanes: Lane[]): void {
 
   private getLaneWidth(lane: Lane, laneCount: number): number {
     return lane.width && lane.width > 0 ? lane.width : this.getDefaultLaneWidth(laneCount);
+  }
+
+  private getLaneHeight(lane: Lane): number {
+    return lane.height && lane.height > 0 ? lane.height : this.canvasHeight;
   }
 
   private getDefaultLaneWidth(laneCount: number): number {

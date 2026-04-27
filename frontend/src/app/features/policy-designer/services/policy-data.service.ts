@@ -5,6 +5,7 @@ import { Lane, PolicyPayload, PolicySummary, TaskExecutionOrder } from '../model
 @Injectable({ providedIn: 'root' })
 export class PolicyDataService {
   private laneWidthSupported: boolean | null = null;
+  private laneHeightSupported: boolean | null = null;
 
   public async getAllPolicies(): Promise<PolicySummary[]> {
     const response = await executeGraphql<{ getAllPolicies: PolicySummary[] }>(`
@@ -21,7 +22,7 @@ export class PolicyDataService {
   }
 
   public async getPolicyById(id: string): Promise<PolicyPayload | null> {
-    if (this.laneWidthSupported === false) {
+    if (this.laneWidthSupported === false || this.laneHeightSupported === false) {
       return this.getPolicyByIdWithoutWidth(id);
     }
 
@@ -39,19 +40,22 @@ export class PolicyDataService {
               color
               x
               width
+              height
             }
           }
         }
       `, { id });
 
       this.laneWidthSupported = true;
+      this.laneHeightSupported = true;
       return response.getPolicyById ?? null;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (!/Field 'width' in type 'Lane' is undefined|FieldUndefined@\[(getPolicyById\/lanes\/width)\]/i.test(message)) {
+      if (!/Field 'width' in type 'Lane' is undefined|FieldUndefined@\[(getPolicyById\/lanes\/width)\]|Field 'height' in type 'Lane' is undefined|FieldUndefined@\[(getPolicyById\/lanes\/height)\]/i.test(message)) {
         throw error;
       }
       this.laneWidthSupported = false;
+      this.laneHeightSupported = false;
       return this.getPolicyByIdWithoutWidth(id);
     }
   }
@@ -72,7 +76,7 @@ export class PolicyDataService {
 
   public async updatePolicyDiagram(policyId: string, diagramJson: string, lanes: Lane[]): Promise<void> {
     const lanePayload = lanes.map((lane) =>
-      this.laneWidthSupported
+      this.laneWidthSupported && this.laneHeightSupported
         ? lane
         : {
             id: lane.id,

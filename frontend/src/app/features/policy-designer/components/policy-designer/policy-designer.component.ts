@@ -261,11 +261,11 @@ export class PolicyDesignerComponent implements OnInit, AfterViewInit, OnDestroy
       
       // Opcional: Define un tamaño mínimo para que el nodo no desaparezca al achicarlo
       minWidth: isLaneBackground ? 120 : 50,
-      minHeight: isLaneBackground ? this.diagramCanvasService.getCanvasHeight() : 30,
+      minHeight: isLaneBackground ? 120 : 30,
       
       // Opcional: Puedes especificar qué puntos de agarre quieres mostrar
       // 'nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'
-      directions: isLaneBackground ? ['e', 'w'] : ['e', 'w', 's', 'n', 'nw', 'ne', 'se', 'sw']
+      directions: isLaneBackground ? ['e', 'w', 's'] : ['e', 'w', 's', 'n', 'nw', 'ne', 'se', 'sw']
     });
     
     this.freeTransform.render();
@@ -604,7 +604,8 @@ private showLinkTools(linkView: dia.LinkView): void {
       id: laneId,
       name: selectedArea.name,
       color: selectedArea.color,
-      x: 0
+      x: 0,
+      height: this.diagramCanvasService.getCanvasHeight()
     };
 
     this.lanes = this.diagramCanvasService.recalculateLanePositions([...this.lanes, lane]);
@@ -1372,17 +1373,24 @@ private showLinkTools(linkView: dia.LinkView): void {
           (area) => area.id === lane.id || area.name === lane.id || area.name === lane.name
         );
         if (!matchedArea) {
-          return null;
+          return {
+            id: lane.id,
+            name: lane.name,
+            color: lane.color,
+            x: lane.x ?? 0,
+            width: lane.width,
+            height: lane.height ?? this.diagramCanvasService.getCanvasHeight()
+          } as Lane;
         }
         return {
           id: matchedArea.name,
           name: matchedArea.name,
           color: matchedArea.color,
           x: lane.x ?? 0,
-          width: lane.width
+          width: lane.width,
+          height: lane.height ?? this.diagramCanvasService.getCanvasHeight()
         } as Lane;
-      })
-      .filter((lane): lane is Lane => lane !== null);
+      });
   }
 
   private hasPersistedLaneGeometry(lanes: Lane[]): boolean {
@@ -1425,7 +1433,8 @@ private showLinkTools(linkView: dia.LinkView): void {
       updatedLanes.push({
         ...lane,
         x: Number((position.x + size.width / 2).toFixed(2)),
-        width: Number(Math.max(120, size.width).toFixed(2))
+        width: Number(Math.max(120, size.width).toFixed(2)),
+        height: Number(Math.max(120, size.height).toFixed(2))
       });
     }
 
@@ -1555,9 +1564,13 @@ private showLinkTools(linkView: dia.LinkView): void {
 
     try {
       const currentDiagram = this.graph.toJSON();
-      const activeLanesPayload = this.lanes.map(lane => ({
-          id: lane.id,
-          name: lane.name 
+      const activeLanesPayload = this.lanes.map((lane) => ({
+        id: lane.id,
+        name: lane.name,
+        color: lane.color,
+        x: lane.x,
+        width: lane.width,
+        height: lane.height
       }));
       
       // 2. Opcional pero recomendado: Pasarle las áreas disponibles al chat
@@ -1596,13 +1609,16 @@ private showLinkTools(linkView: dia.LinkView): void {
         // ---> LA MAGIA: ACTUALIZAMOS LAS CALLES CON LA RESPUESTA DE LA IA <---
         if (apply.lanes && apply.lanes.length > 0) {
            // Mapeamos para asegurarnos de que coincida con tu interfaz de Angular
-           this.lanes = apply.lanes.map(lane => ({
-               id: lane.id || lane._id,
-               name: lane.name,
+           this.lanes = apply.lanes
+             .map((lane) => ({
+               id: String(lane.id || lane._id || '').trim(),
+               name: String(lane.name || lane.id || lane._id || '').trim(),
                color: lane.color || '#F8FAFC', // Color por defecto si la IA lo omite
-               x: lane.x,
-               width: lane.width
-           }));
+               x: Number.isFinite(Number(lane.x)) ? Number(lane.x) : 0,
+               width: Number.isFinite(Number(lane.width)) ? Number(lane.width) : undefined,
+               height: Number.isFinite(Number(lane.height)) ? Number(lane.height) : this.diagramCanvasService.getCanvasHeight()
+             }))
+             .filter((lane) => lane.id.length > 0 && lane.name.length > 0);
         }
         // -------------------------------------------------------------------
 
@@ -1708,7 +1724,7 @@ private showLinkTools(linkView: dia.LinkView): void {
       if (addPattern.test(normalizedText) && !this.lanes.some((lane) => lane.id === area.name)) {
         this.lanes = this.diagramCanvasService.recalculateLanePositions([
           ...this.lanes,
-          { id: area.name, name: area.name, color: area.color, x: 0 }
+          { id: area.name, name: area.name, color: area.color, x: 0, height: this.diagramCanvasService.getCanvasHeight() }
         ]);
         changed = true;
       }
@@ -1734,14 +1750,14 @@ private showLinkTools(linkView: dia.LinkView): void {
   ): dia.Graph.JSON {
     const nextDiagram = this.asGraphJson(appliedDiagram);
     if (!nextDiagram.cells.length) {
-      return currentDiagram;
+      return this.diagramCanvasService.normalizeDiagramForDesigner(currentDiagram, this.lanes);
     }
 
-    if (this.isDestructiveIntent(instruction)) {
-      return nextDiagram;
-    }
+    const merged = this.isDestructiveIntent(instruction)
+      ? nextDiagram
+      : this.mergeGraphCells(currentDiagram, nextDiagram);
 
-    return this.mergeGraphCells(currentDiagram, nextDiagram);
+    return this.diagramCanvasService.normalizeDiagramForDesigner(merged, this.lanes);
   }
 
   private asGraphJson(diagram: Record<string, unknown> | null | undefined): dia.Graph.JSON {
@@ -1793,4 +1809,3 @@ private showLinkTools(linkView: dia.LinkView): void {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 }
-

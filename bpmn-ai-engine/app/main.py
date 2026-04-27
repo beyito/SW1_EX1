@@ -42,6 +42,8 @@ openai_client = OpenAI(
 class CopilotRequest(BaseModel):
     userMessage: str = Field(..., min_length=1)
     currentDiagram: Dict[str, Any] = Field(default_factory=dict)
+    lanes: List[Dict[str, Any]] = Field(default_factory=list)
+    context: str | None = None
     models: List[str] = Field(default_factory=list)
     history: List[Dict[str, Any]] = Field(default_factory=list)
 
@@ -84,7 +86,22 @@ def process_diagram(request: AgentRequest) -> AgentResult:
             status_code=400,
             detail="current_diagram es obligatorio cuando operation=modify",
         )
-    return agent_service.process(request)
+    logger.info(
+        "agent_diagram request received operation=%s instruction_len=%s lanes=%s cells=%s",
+        request.operation,
+        len(request.instruction or ""),
+        len(request.lanes or []),
+        len((request.current_diagram or {}).get("cells") or []),
+    )
+    result = agent_service.process(request)
+    logger.info(
+        "agent_diagram response operation=%s result_lanes=%s result_cells=%s warnings=%s",
+        result.operation,
+        len(result.lanes or []),
+        len((result.diagram or {}).get("cells") or []),
+        len(result.warnings or []),
+    )
+    return result
 
 
 @app.post("/api/ai/copilot-chat", response_model=CopilotResponse)
@@ -93,10 +110,12 @@ def copilot_chat(payload: CopilotRequest, http_request: Request) -> CopilotRespo
     diagram_cells = payload.currentDiagram.get("cells") if isinstance(payload.currentDiagram, dict) else None
     cell_count = len(diagram_cells) if isinstance(diagram_cells, list) else 0
     logger.info(
-        "copilot_chat request received: request_id=%s message_len=%s cell_count=%s model=%s",
+        "copilot_chat request received: request_id=%s message_len=%s cell_count=%s lanes=%s has_context=%s model=%s",
         request_id,
         len(payload.userMessage or ""),
         cell_count,
+        len(payload.lanes or []),
+        bool(payload.context and payload.context.strip()),
         settings.ai_models[0] if settings.ai_models else settings.ai_model,
     )
 
@@ -125,6 +144,8 @@ def copilot_chat(payload: CopilotRequest, http_request: Request) -> CopilotRespo
     user_payload = {
         "user_message": payload.userMessage,
         "current_diagram": payload.currentDiagram,
+        "lanes": payload.lanes,
+        "context": payload.context,
         "conversation_history": payload.history,
     }
 

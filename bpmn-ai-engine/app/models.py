@@ -14,6 +14,7 @@ class LaneModel(BaseModel):
     color: str = Field(default="#dbeafe")
     x: Optional[float] = None
     width: Optional[float] = None
+    height: Optional[float] = None
 
 
 class AgentRequest(BaseModel):

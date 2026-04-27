@@ -58,7 +58,7 @@ c:/SW1_EX1
 
 ### Politica
 - `Policy`: `id`, `name`, `description`, `diagramJson`, `lanes`, `startLaneId`.
-- `Lane`: `id`, `name`, `color`, `x`, `width`.
+- `Lane`: `id`, `name`, `color`, `x`, `width`, `height`.
 
 ### Diagrama (JointJS)
 - `cells` con nodos y enlaces.
@@ -70,6 +70,8 @@ c:/SW1_EX1
   - `condition.type` (`expression`/`default`)
   - `condition.script` (SpEL)
   - `conditionLabel`.
+- Nota de consistencia visual:
+  - los cambios IA pasan por normalizacion frontend (`normalizeDiagramForDesigner`) para igualar estilos/size/attrs con los nodos manuales.
 
 ### Ejecucion
 - `ProcessInstance`: proceso activo/completado.
@@ -131,6 +133,7 @@ c:/SW1_EX1
 - Persistencia/sanitizado:
   - `getPersistedGraphJSON(graph)`
   - `sanitizeGraphJSON(graphJson)`
+  - `normalizeDiagramForDesigner(diagram, lanes)` (normaliza estilo y posicion de nodos IA por carril)
 - Edicion:
   - `updateNodeLabel(...)`
   - `updateLinkCondition(...)`
@@ -244,7 +247,9 @@ c:/SW1_EX1
 ### `CopilotService` (backend gateway)
 - `chat`
 - `getConversationHistory`
-- `apply`.
+- `apply`
+- `parseChatResponse` (parse robusto desde `String`, independiente de content-type)
+- `parseApplyResponse`.
 
 ## 7.5 IA microservice
 
@@ -270,12 +275,14 @@ c:/SW1_EX1
 
 1. Nunca persistir fondos de lane en `diagramJson` (solo nodos/enlaces).
 2. Mantener `Lane.x` y `Lane.width` actualizados para evitar drift entre navegadores.
-3. Todo nodo debe tener `nodeType`.
-4. Todo enlace debe apuntar a nodos existentes.
-5. Al aplicar IA:
+3. Mantener tambien `Lane.height` para layout consistente entre sesiones/navegadores.
+4. Todo nodo debe tener `nodeType`.
+5. Todo enlace debe apuntar a nodos existentes.
+6. Al aplicar IA:
    - si instruccion no es destructiva, fusionar con base.
    - si es destructiva, reemplazo completo permitido.
-6. `DECISION` debe tener condiciones coherentes (`expression/default`) para que el motor enrute correctamente.
+7. Luego de fusionar, normalizar diagrama con `normalizeDiagramForDesigner(...)` antes de renderizar y guardar.
+8. `DECISION` debe tener condiciones coherentes (`expression/default`) para que el motor enrute correctamente.
 
 ## 9) Problemas historicos que ya se mitigaron
 

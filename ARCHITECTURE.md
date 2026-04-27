@@ -45,15 +45,22 @@
 - Grilla visual, enlaces ortogonales, flechas configuradas y herramientas de edicion.
 
 ### 3.2 Lanes (swimlanes) y geometria
-- Lanes persistidas con `id`, `name`, `color`, `x`, `width`.
+- Lanes persistidas con `id`, `name`, `color`, `x`, `width`, `height`.
 - Dibujo de carriles con `HeaderedRectangle` de JointJS como fondo no interactivo de flujo.
 - Captura de cambios de ancho/posicion y sincronizacion por full-sync entre navegadores.
-- Normalizacion de geometria cuando faltan `x/width`.
+- Normalizacion de geometria cuando faltan `x/width/height`.
 
 ### 3.3 Modelo de nodos
 - Tipos soportados: `START`, `TASK`, `DECISION`, `FORK`, `JOIN`, `SYNCHRONIZATION`, `END`.
-- Cada nodo mantiene `nodeType`, metadata (`nodeMeta`) y puertos `in/out`.
+- Cada nodo mantiene `nodeType` y metadata (`nodeMeta`).
 - Enlaces desde `DECISION` pueden llevar `condition` (SpEL) y `conditionLabel`.
+
+### 3.4 Normalizacion IA en frontend
+- Todo diagrama retornado por Copilot se procesa con `DiagramCanvasService.normalizeDiagramForDesigner(...)`.
+- Esta normalizacion:
+  - reestablece estilos/shape/attrs al estandar del diseñador manual
+  - corrige posiciones para mantener nodos dentro de su carril (`laneId`)
+  - evita divergencia visual entre nodos manuales vs nodos IA.
 
 ## 4. Ejecucion de procesos (backend)
 
@@ -114,6 +121,7 @@
 - `DiagramCanvasService`:
   - `createGraph`, `createPaper`, `createShape`, `createLink`
   - `renderLaneBackgrounds`, `renderPolicy`, `getPersistedGraphJSON`
+  - `normalizeDiagramForDesigner`
   - `recalculateLanePositions`, `getLaneIdByX`, `updateLinkCondition`
 - `PolicyDataService`:
   - `getPolicyById`, `updatePolicyDiagram`, `getTaskExecutionOrder`
@@ -131,7 +139,7 @@
 - `ProcessExecutionService`:
   - `startProcess`, `completeTask`, `startTask`, `getMyTasks`, `getTaskDetail`
 - `CopilotService`:
-  - `chat`, `getConversationHistory`, `apply`
+  - `chat`, `getConversationHistory`, `apply`, `parseChatResponse`, `parseApplyResponse`
 - `DesignerSocketController`:
   - `handlePolicyChange`
 
@@ -143,7 +151,7 @@
 
 ## 9. Riesgos y notas tecnicas
 
-- Consistencia cross-browser depende de persistir y sincronizar `lane.x` y `lane.width`.
+- Consistencia cross-browser depende de persistir y sincronizar `lane.x`, `lane.width` y `lane.height`.
 - Cambios IA no destructivos deben fusionarse, no reemplazar diagrama completo.
 - Si un enlace referencia nodos inexistentes, el saneamiento lo elimina.
-- Validar siempre que el backend y schema GraphQL expongan `Lane.width`.
+- Validar siempre que el backend y schema GraphQL expongan `Lane.width` y `Lane.height`.

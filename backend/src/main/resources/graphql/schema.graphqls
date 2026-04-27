@@ -19,6 +19,7 @@ type Lane {
     color: String
     x: Float
     width: Float
+    height: Float
 }
 
 input LaneInput {
@@ -27,6 +28,7 @@ input LaneInput {
     color: String
     x: Float
     width: Float
+    height: Float
 }
 
 # ==========================================
