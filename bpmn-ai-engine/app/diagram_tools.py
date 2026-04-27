@@ -43,7 +43,12 @@ def sanitize_diagram(diagram: Dict[str, Any], lanes: List[Dict[str, Any]] | None
         node_type = str(cell.get("nodeType", "")).upper()
 
         if cell_type != "standard.Link":
-            if node_type and node_type not in ALLOWED_NODE_TYPES:
+            # DEFENSIVA 4: Proteger el nodeType para Spring Boot
+            if not node_type:
+                node_type = "TASK"
+                cell["nodeType"] = "TASK"
+                warnings.append(f"La IA omitió el 'nodeType'. Se asignó 'TASK' por defecto al nodo {cell.get('id')}.")
+            elif node_type not in ALLOWED_NODE_TYPES:
                 warnings.append(f"Se eliminó nodo de tipo no soportado: '{node_type}'.")
                 continue
             
@@ -104,7 +109,22 @@ def sanitize_diagram(diagram: Dict[str, Any], lanes: List[Dict[str, Any]] | None
             cell["target"] = {"id": resolved_target}
             source_id = resolved_source
             target_id = resolved_target
-        
+            
+        if not cell.get("attrs") or "line" not in cell.get("attrs", {}):
+            cell["attrs"] = {
+                "line": {
+                    "stroke": "#0f172a",
+                    "strokeWidth": 3,
+                    "targetMarker": {
+                        "type": "path",
+                        "d": "M 10 -5 0 0 10 5 z",
+                        "fill": "#0f172a",
+                        "stroke": "#0f172a",
+                        "stroke-width": 1
+                    }
+                }
+            }
+
         if source_id in node_ids and target_id in node_ids:
             valid_cells.append(cell)
         else:

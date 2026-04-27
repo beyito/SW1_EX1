@@ -1555,10 +1555,18 @@ private showLinkTools(linkView: dia.LinkView): void {
 
     try {
       const currentDiagram = this.graph.toJSON();
-      const response = await this.copilotService.sendMessage(text, currentDiagram, {
+      const activeLanesPayload = this.lanes.map(lane => ({
+          id: lane.id,
+          name: lane.name 
+      }));
+      
+      // 2. Opcional pero recomendado: Pasarle las áreas disponibles al chat
+      const availableAreasContext = this.availableAreas.map(area => area.name).join(', ');
+      const response = await this.copilotService.sendMessage(text, currentDiagram, activeLanesPayload, {
         conversationId: this.copilotConversationId,
         policyId: this.selectedPolicyId,
-        policyName: this.policyName
+        policyName: this.policyName,
+        context: `Áreas disponibles en la empresa: ${availableAreasContext}`
       });
       this.copilotConversationId = response.conversationId ?? this.copilotConversationId;
       this.copilotMessages = [
@@ -1571,7 +1579,10 @@ private showLinkTools(linkView: dia.LinkView): void {
         }
       ];
       if (this.isMutationIntent(text)) {
-        this.applyLaneCommandsFromText(text);
+        // Nota: this.applyLaneCommandsFromText(text) quizás ya no sea necesario 
+        // si la IA te devuelve la estructura perfecta en lanes_layout, pero puedes dejarlo por ahora.
+        this.applyLaneCommandsFromText(text); 
+        
         const apply = await this.copilotService.applyChange(
           text,
           currentDiagram,
@@ -1582,6 +1593,19 @@ private showLinkTools(linkView: dia.LinkView): void {
           }
         );
 
+        // ---> LA MAGIA: ACTUALIZAMOS LAS CALLES CON LA RESPUESTA DE LA IA <---
+        if (apply.lanes && apply.lanes.length > 0) {
+           // Mapeamos para asegurarnos de que coincida con tu interfaz de Angular
+           this.lanes = apply.lanes.map(lane => ({
+               id: lane.id || lane._id,
+               name: lane.name,
+               color: lane.color || '#F8FAFC', // Color por defecto si la IA lo omite
+               x: lane.x,
+               width: lane.width
+           }));
+        }
+        // -------------------------------------------------------------------
+
         const currentGraph = this.diagramCanvasService.getPersistedGraphJSON(this.graph);
         const resolvedDiagram = this.resolveCopilotDiagram(text, currentGraph, apply.diagram);
 
@@ -1590,9 +1614,11 @@ private showLinkTools(linkView: dia.LinkView): void {
           name: this.policyName || 'Politica',
           description: '',
           diagramJson: JSON.stringify(resolvedDiagram),
-          lanes: this.lanes
+          lanes: this.lanes // ¡AHORA SÍ GUARDA LOS CARRILES NUEVOS DE LA IA!
         };
+        
         this.applyPolicy(updatedPolicy);
+        
         if (this.selectedPolicyId) {
           await this.policyDataService.updatePolicyDiagram(
             this.selectedPolicyId,
@@ -1600,6 +1626,7 @@ private showLinkTools(linkView: dia.LinkView): void {
             this.lanes
           );
         }
+        
         this.broadcastFullSync(resolvedDiagram as Record<string, unknown>, this.lanes);
 
         const warnings = apply.warnings?.length ? ` | Advertencias: ${apply.warnings.join(' | ')}` : '';

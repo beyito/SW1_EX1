@@ -1,140 +1,173 @@
-# Comunicación entre servicios (Front, Back, AWS, DuckDNS, WebSocket, Mobile)
+# Comunicacion entre servicios
 
-Documento guiado por `ARCHITECTURE.md` y ajustado al estado implementado en el código actual.
+## 1. Topologia actual
 
-## 1) Topología actual
+- `frontend` (Angular, navegador):
+  - HTTP -> `backend` (`/api/*`, `/graphql`)
+  - WebSocket STOMP -> `backend` (`/ws-designer`)
+- `backend` (Spring Boot):
+  - MongoDB (persistencia principal)
+  - RabbitMQ/STOMP relay (broadcast colaborativo)
+  - AWS S3 (adjuntos)
+  - `bpmn-ai-engine` (copilot y agente)
+- `bpmn-ai-engine` (FastAPI):
+  - OpenAI API (si `AI_API_KEY` activo)
 
-- Dominio público: `https://bpmn-soft.duckdns.org` (DuckDNS apunta a la IP pública de EC2).
-- Contenedores Docker Compose:
-  - `frontend` (Nginx + Angular) en `:4200` (host) -> `:80` (contenedor).
-  - `backend` (Spring Boot) en `:8080`.
-  - `rabbitmq` (STOMP relay) en `:5672` y UI `:15672`.
-- Red interna Docker: `bpmn-net`.
-- Servicios externos:
-  - MongoDB (vía `MONGODB_URI`, actualmente externo/Atlas).
-  - AWS S3 (adjuntos + URLs firmadas).
+## 2. Contratos frontend -> backend
 
-## 2) Matriz de comunicación
+### 2.1 Auth REST
+- `POST /api/auth/login`
+- `POST /api/auth/mobile/login`
+- `POST /api/auth/register`
+- `GET /api/auth/me`
 
-| Origen | Destino | Protocolo | Ruta/Canal | Propósito |
-|---|---|---|---|---|
-| Browser | DuckDNS + Nginx | HTTPS | `https://bpmn-soft.duckdns.org` | Entrada pública web |
-| Nginx | Backend | HTTP interno | `/api/* -> backend:8080/api/*` | REST |
-| Nginx | Backend | HTTP interno | `/graphql -> backend:8080/graphql` | GraphQL |
-| Browser | Backend (via Nginx) | WSS/WS + STOMP | `/ws-designer` | Colaboración en tiempo real |
-| Backend STOMP | RabbitMQ | STOMP Relay | Prefijos `/topic`, `/queue` | Distribución de eventos |
-| Backend | MongoDB | Mongo protocol | `MONGODB_URI` | Persistencia de negocio |
-| Backend | AWS S3 | HTTPS (AWS SDK v2) | `PutObject`, `PresignGetObject` | Adjuntos y URLs firmadas |
-| Mobile App | Backend | HTTPS/HTTP (Dio) | `/api/auth/mobile/login`, `/api/execution/*`, `/api/files/upload` | Login cliente + trámites/tareas |
+### 2.2 Admin REST
+- `GET/POST /api/admin/companies`
+- `GET/POST/PUT/DELETE /api/admin/company-admins`
+- `GET/POST/PUT/DELETE /api/admin/areas`
+- `GET/POST/PUT/DELETE /api/admin/functionaries`
+- `GET/POST/PUT/DELETE /api/admin/clients`
 
-## 3) Flujo web end-to-end
+### 2.3 Ejecucion REST
+- `POST /api/execution/process/start`
+- `POST /api/execution/tasks/{taskId}/take`
+- `POST /api/execution/tasks/{taskId}/start`
+- `POST /api/execution/tasks/{taskId}/complete`
+- `GET /api/execution/tasks/{taskId}`
+- `GET /api/execution/my-tasks`
+- `GET /api/execution/my-processes/tasks`
+- `GET /api/execution/startable-policies`
+- `GET /api/execution/client/tasks/pending`
 
-1. Usuario entra a `https://bpmn-soft.duckdns.org`.
-2. DuckDNS resuelve dominio a la IP pública EC2.
-3. Nginx recibe tráfico:
-   - Sirve Angular para `/`.
-   - Proxya `/api`, `/graphql`, `/ws-designer` a `backend:8080`.
-4. Frontend usa rutas relativas (`/api/...`, `/graphql`), evitando hardcode de host.
-5. Backend valida token/cors y procesa casos de uso.
+### 2.4 GraphQL
+- Query:
+  - `getAllPolicies`
+  - `getPolicyById(id)`
+  - `getTaskExecutionOrder(policyId)`
+  - `myTasks`
+  - `getTaskDetail(taskId)`
+- Mutation:
+  - `createPolicy(name, description)`
+  - `updatePolicyGraph(policyId, diagramJson, lanes)`
+  - `takeTask(taskId)`
+  - `completeTask(taskId, formData)`
 
-## 4) Flujo de autenticación y autorización
+### 2.5 Copilot REST (gateway Spring)
+- `POST /api/copilot/chat`
+- `GET /api/copilot/history?policyId=...|conversationId=...`
+- `POST /api/copilot/apply`
 
-1. Front web: `POST /api/auth/login`; mobile: `POST /api/auth/mobile/login`.
-2. `AuthService` autentica contra Mongo (`UserRepository`).
-3. `TokenService` emite token de sesión en memoria.
-4. Cliente guarda token (`localStorage` web / secure storage mobile).
-5. En requests siguientes, se envía `Authorization: Bearer <token>`.
-6. `AuthTokenFilter` reconstruye usuario y authorities en `SecurityContext`.
-7. `@PreAuthorize` y reglas de servicio aplican control por rol/carril.
+### 2.6 Files REST
+- `POST /api/files/upload` (`multipart/form-data`)
 
-## 5) Flujo CORS y dominio
+### 2.7 WebSocket STOMP
+- Connect broker: `ws(s)://<host>/ws-designer`
+- Publish: `/app/policy/{policyId}/change`
+- Subscribe: `/topic/policy.{policyId}`
 
-- CORS se define en `SecurityConfig` con `app.cors.allowed-origins`.
-- Valor efectivo se inyecta desde `infra/.env` -> `docker-compose.yml` -> backend.
-- Para producción web, el origin clave es:
-  - `https://bpmn-soft.duckdns.org`
-- También están permitidos localhost para desarrollo.
+## 3. Contratos backend -> IA
 
-## 6) Flujo de colaboración en tiempo real (WebSocket)
+### 3.1 Chat
+- Backend (`CopilotService.chat`) llama:
+  - `POST {aiBaseUrl}/api/ai/copilot-chat`
+- Payload:
+  - `userMessage`
+  - `currentDiagram`
+  - `history`
+- Response:
+  - `message`
+  - `suggested_actions`
 
-1. Front conecta STOMP a `wss://bpmn-soft.duckdns.org/ws-designer`.
-2. Publica cambios del diagrama a `/app/policy/{policyId}/change`.
-3. `DesignerSocketController` recibe y reenvía a `/topic/policy.{policyId}`.
-4. Broker relay de Spring pasa mensajes por RabbitMQ.
-5. Clientes suscritos a `/topic/policy.{policyId}` reciben cambios.
-6. El diseñador aplica eventos remotos (`add/move/remove/update`) sobre el grafo.
+### 3.2 Apply
+- Backend (`CopilotService.apply`) llama:
+  - `POST {aiBaseUrl}/api/v1/agent/diagram`
+- Payload:
+  - `operation=modify`
+  - `instruction`
+  - `current_diagram`
+  - `lanes`
+  - `context`
+- Response:
+  - `summary`
+  - `changes`
+  - `warnings`
+  - `diagram`
 
-## 7) Flujo de adjuntos con AWS S3
+## 4. Flujos de comunicacion clave
 
-1. Front/Mobile arma `multipart/form-data` y llama `POST /api/files/upload`.
-2. Backend (`S3Service`) sube bytes al bucket (`putObject`).
-3. Backend genera URL firmada de lectura (`presignGetObject`).
-4. Respuesta al cliente: `key`, `url`, `contentType`, `size`.
-5. Cliente guarda `url/key` en metadata de diagrama o `formData` de tarea.
+### 4.1 Guardado de diagrama con lanes
+1. Frontend serializa `graph` (sin fondos de lanes) con `getPersistedGraphJSON`.
+2. Frontend envia mutation `updatePolicyGraph(policyId, diagramJson, lanes)`.
+3. Backend `PolicyService.updatePolicyGraph`:
+   - recorre `cells`
+   - asigna `laneId` por posicion X usando geometria de lanes (`x`, `width`)
+   - persiste `diagramJson`, `startLaneId`, `lanes`.
 
-## 8) Flujo de ejecución de procesos y tareas
+### 4.2 Sincronizacion colaborativa
+1. Usuario A mueve/agrega/elimina celda.
+2. Frontend A publica evento STOMP.
+3. Backend retransmite al topic de politica.
+4. Usuario B recibe y aplica:
+   - `move`/`add`/`remove`/`cell-sync` incremental.
+   - `full-sync` para cambios de carriles/layout global.
 
-1. Front/Mobile consulta políticas iniciables (`/api/execution/startable-policies`).
-2. Inicia proceso (`/api/execution/process/start`).
-3. `ProcessExecutionService` crea `ProcessInstance` y tareas `PENDING`.
-4. Usuario toma tarea (`/tasks/{id}/take`) y la completa (`/tasks/{id}/complete`).
-5. Si la tarea está antes de una decisión, frontend aplica lookahead y envía `_decisionTomada` en `formData`.
-6. Motor de workflow (`WorkflowEngine` + `advanceWorkflow`) evalúa SpEL de links de decisión y activa solo la rama válida (o `default`).
-6. Todo queda persistido en Mongo (`policies`, `process_instances`, `task_instances`, etc.).
+### 4.3 Zoom/pan responsive local
+- No se envia por red.
+- Afecta viewport local (`paper.scale/translate`), no coordenadas persistidas.
+- Coordenadas de nodos/carriles siguen en sistema del diagrama.
 
-## 8.1) Flujo específico de decisión (lookahead + SpEL)
+### 4.4 Ejecucion de tareas con decision
+1. Usuario completa tarea con `formData`.
+2. Backend parsea variables (ejemplo `_decisionTomada`).
+3. `WorkflowEngine` evalua enlaces `condition.type=expression` (SpEL).
+4. Si no hay match, usa `condition.type=default` cuando exista.
 
-1. Front obtiene `diagramJson` y `taskId` en `GET /api/execution/tasks/{id}`.
-2. Hace lookahead local:
-   - siguiente nodo de la tarea actual;
-   - si es `DECISION`, lista labels de salidas (`conditionLabel`).
-3. Muestra botones `Completar: <opción>`.
-4. En submit agrega `_decisionTomada: <opción>` al `formData`.
-5. Backend evalúa scripts tipo `#_decisionTomada == 'Sí'` y continúa por un único camino.
+### 4.5 IA apply no destructivo
+1. Frontend pide `apply`.
+2. IA retorna diagrama propuesto.
+3. Frontend fusiona con diagrama actual si instruccion no es destructiva.
+4. Se aplica al grafo, se persiste por GraphQL y se emite `full-sync`.
 
-## 9) Comunicación mobile
+## 5. Matriz de metodos y dependencias
 
-- Base URL definida por `API_BASE_URL` (`mobile/lib/core/config/env.dart`).
-- Cliente mobile usa `Dio` con interceptor de token.
-- Consume los mismos endpoints REST que web para ejecución y archivos.
-- No usa GraphQL ni WebSocket del diseñador en la implementación actual.
+### Frontend
+- `PolicyDataService` -> `executeGraphql` -> `/graphql`.
+- `WebSocketService` -> STOMP broker `/ws-designer`.
+- `CopilotService` -> `/api/copilot/*`.
+- `CompanyAreaService` -> `/api/admin/areas`.
+- `FileService` -> `/api/files/upload`.
 
-## 10) Variables de entorno críticas
+### Backend
+- `PolicyGraphQLController` -> `PolicyService`.
+- `ExecutionGraphQLController` -> `ProcessExecutionService`.
+- `ProcessExecutionController` -> `ProcessExecutionService`, `PolicyService`.
+- `CopilotController` -> `CopilotService` -> IA.
+- `DesignerSocketController` -> `SimpMessagingTemplate`.
 
-- Backend/App:
-  - `APP_PUBLIC_BASE_URL`
-  - `CORS_ALLOWED_ORIGINS`
-- Mongo:
-  - `MONGODB_URI` / `SPRING_DATA_MONGODB_URI`
-- RabbitMQ:
-  - `SPRING_RABBITMQ_HOST`
-  - `SPRING_RABBITMQ_STOMP_PORT`
-  - `SPRING_RABBITMQ_USERNAME`
-  - `SPRING_RABBITMQ_PASSWORD`
-- AWS:
-  - `AWS_REGION`
-  - `AWS_S3_BUCKET`
-  - `AWS_ACCESS_KEY_ID`
-  - `AWS_SECRET_ACCESS_KEY`
+### IA
+- `main.py`:
+  - `/api/ai/copilot-chat` usa OpenAI chat completions.
+  - `/api/v1/agent/diagram` usa `DiagramAgentService.process`.
+- `diagram_tools.sanitize_diagram` garantiza consistencia estructural.
 
-## 11) Notas de consistencia (importante)
+## 6. Variables y configuracion critica
 
-- `ARCHITECTURE.md` menciona Redis y contenedor Mongo local en la visión objetivo.
-- La implementación activa usa:
-  - RabbitMQ STOMP relay para tiempo real.
-  - Mongo externo vía URI (no hay servicio `mongo` en `docker-compose.yml` actual).
-- Recomendación: mantener `ARCHITECTURE.md` alineado con este estado para evitar confusión operativa.
-- El gateway `DECISION` se resuelve automáticamente en backend (no se crea tarea humana de decisión).
+- Backend:
+  - `spring.mongodb.uri`
+  - AWS S3 (`bucket`, credenciales)
+  - seguridad y CORS
+  - `app.ai-engine.base-url`
+- IA:
+  - `AI_API_KEY`
+  - `AI_BASE_URL`
+  - `AI_MODELS` / `AI_MODEL`
+  - `AI_TIMEOUT_SECONDS`
+- Frontend:
+  - proxy hacia backend (`/api`, `/graphql`, `/ws-designer`)
 
----
+## 7. Reglas de consistencia operativa
 
-## Referencias técnicas
-- `infra/nginx.conf`
-- `infra/docker-compose.yml`
-- `infra/.env`
-- `backend/src/main/java/com/politicanegocio/core/config/SecurityConfig.java`
-- `backend/src/main/java/com/politicanegocio/core/config/WebSocketConfig.java`
-- `backend/src/main/java/com/politicanegocio/core/websocket/DesignerSocketController.java`
-- `backend/src/main/java/com/politicanegocio/core/service/S3Service.java`
-- `frontend/src/app/features/policy-designer/services/web-socket.service.ts`
-- `mobile/lib/core/network/api_client.dart`
+- Persistir siempre lanes con `x` y `width` para evitar drift entre navegadores.
+- No incluir celdas de fondo de carril en `diagramJson`.
+- Enlaces deben tener source/target validos; referencias huerfanas son eliminadas por saneamiento.
+- Si una operacion IA es aditiva, fusionar con diagrama base en lugar de reemplazarlo completo.

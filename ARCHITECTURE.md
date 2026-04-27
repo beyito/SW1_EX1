@@ -1,123 +1,149 @@
-# BPMN Engine Architecture
+# Arquitectura del Sistema BPMN Colaborativo
 
-## Final Monorepo Tree
+## 1. Monorepo y componentes
 
 ```text
-/
-|-- backend/               # Spring Boot API + GraphQL + WebSocket (STOMP/RabbitMQ) + S3
-|   |-- src/
-|   |-- pom.xml
-|   `-- Dockerfile
-|-- bpmn-ai-engine/        # FastAPI microservice for AI-assisted BPMN generation/modification
-|   |-- app/
-|   |-- requirements.txt
-|   `-- .env
-|-- frontend/              # Angular standalone app + JointJS designer
-|   |-- src/
-|   |-- package.json
-|   `-- Dockerfile
-|-- infra/
-|   |-- docker-compose.yml
-|   `-- nginx.conf
-|-- .env.example
-`-- ARCHITECTURE.md
+/c:/SW1_EX1
+|- backend/          Spring Boot (REST + GraphQL + WebSocket + MongoDB + S3 + gateway IA)
+|- frontend/         Angular + JointJS (disenador BPMN colaborativo)
+|- bpmn-ai-engine/   FastAPI + OpenAI (copilot chat + agente de modificacion de diagramas)
+|- mobile/           Flutter (cliente final para inicio y seguimiento de tramites)
+|- infra/            docker-compose y configuracion de red/proxy
+|- ARCHITECTURE.md
+|- FUNCIONALIDADES_Y_CU.md
+|- COMUNICACION_SERVICIOS.md
+`- PROJECT_AI_CONTEXT.md
 ```
 
-## Frontend Enterprise UI System
+## 2. Arquitectura logica
 
-La capa Angular ahora sigue un sistema visual unificado para todas las pantallas de gestion:
+- Frontend Angular:
+  - Renderiza y edita el diagrama en JointJS.
+  - Persiste diagrama y lanes por GraphQL.
+  - Sincroniza cambios en vivo por STOMP.
+  - Consume Copilot (chat y apply) por REST.
+- Backend Spring Boot:
+  - API de autenticacion, administracion, ejecucion y metricas.
+  - API GraphQL para politicas y tareas.
+  - WebSocket relay para colaboracion.
+  - Gateway hacia microservicio IA.
+  - Orquestacion BPMN (WorkflowEngine + ProcessExecutionService).
+- IA FastAPI:
+  - `POST /api/ai/copilot-chat` para asistencia conversacional.
+  - `POST /api/v1/agent/diagram` para crear/modificar JSON de diagrama.
+  - Sanitiza y valida nodos/enlaces antes de devolver cambios.
+- Persistencia:
+  - MongoDB: users, areas, companies, policies, process_instances, task_instances, copilot_conversations.
+  - AWS S3: adjuntos de formularios.
 
-- Header global de plataforma (`Enterprise BPMN Suite`) en `app.ts/app.scss`.
-- Tokens de diseno globales en `frontend/src/styles.scss`:
-  - Primario: `#1E3A8A`
-  - Accion positiva: `#10B981`
-  - Panel lateral: `#F3F4F6`
-  - Canvas: `#F9FAFB`
-  - Texto principal/secundario: `#374151` / `#6B7280`
-- Mismo patron de componentes para tablas, tarjetas, formularios y estados interactivos.
-- Disenador BPMN modernizado con sidebar por secciones, lanes tipo gestor visual, chat lateral premium y grilla sutil de lienzo.
+## 3. Disenador BPMN (frontend)
 
-## Attachment Upload Flow to Amazon S3
+### 3.1 Canvas y experiencia de edicion
+- Canvas responsive con `ResizeObserver` y `paper.setDimensions(...)`.
+- Zoom con rueda (`@HostListener('wheel')`) y limites `0.2` a `2.0`.
+- Panning del fondo sobre `blank:pointerdown/move/up` usando `paper.translate(...)`.
+- Grilla visual, enlaces ortogonales, flechas configuradas y herramientas de edicion.
 
-1. User selects a file in the policy designer task form.
-2. Angular calls `FileService.uploadAttachment(file, policyId)` immediately.
-3. Backend endpoint `POST /api/files/upload` receives multipart data.
-4. `S3Service` uploads file bytes to `s3://<bucket>/policies/{policyId}/attachments/...`.
-5. Backend generates a presigned GET URL and returns `{ key, url, contentType, size }`.
-6. Frontend stores the returned `url` (not local file path) in the diagram JSON attachment.
-7. Auto-save persists the updated diagram JSON; no manual disk uploads and no `C:\fakepath` leakage.
+### 3.2 Lanes (swimlanes) y geometria
+- Lanes persistidas con `id`, `name`, `color`, `x`, `width`.
+- Dibujo de carriles con `HeaderedRectangle` de JointJS como fondo no interactivo de flujo.
+- Captura de cambios de ancho/posicion y sincronizacion por full-sync entre navegadores.
+- Normalizacion de geometria cuando faltan `x/width`.
 
-## Real-time Collaboration Across Containers
+### 3.3 Modelo de nodos
+- Tipos soportados: `START`, `TASK`, `DECISION`, `FORK`, `JOIN`, `SYNCHRONIZATION`, `END`.
+- Cada nodo mantiene `nodeType`, metadata (`nodeMeta`) y puertos `in/out`.
+- Enlaces desde `DECISION` pueden llevar `condition` (SpEL) y `conditionLabel`.
 
-- Client sends STOMP events to `/app/policy/{policyId}/change`.
-- Backend `DesignerSocketController` forwards events to `/topic/policy.{policyId}`.
-- Spring WebSocket uses STOMP broker relay backed by RabbitMQ.
-- Connected clients in all containers receive updates consistently.
+## 4. Ejecucion de procesos (backend)
 
-## Lookahead Routing for Decisions
+- `PolicyService` calcula `laneId` de nodos al guardar diagrama y determina `startLaneId`.
+- `WorkflowEngine` evalua flujo siguiente:
+  - Nodos normales: sigue enlaces salientes.
+  - `DECISION`: evalua expresiones SpEL con variables del formulario.
+  - `FORK`: abre ramas en paralelo.
+  - `JOIN`: espera finalizacion de ramas entrantes.
+  - `END`: cierra instancia de proceso.
+- `ProcessExecutionService` crea/avanza tareas pendientes, valida permisos por lane/usuario y completa formularios.
 
-1. While rendering a task form, frontend reads `diagramJson` and `taskId` (current node).
-2. Frontend performs lookahead:
-   - finds immediate next node from current task,
-   - if next node is `DECISION`, extracts outgoing link labels (`conditionLabel`).
-3. UI shows one completion button per decision option (`Completar: Sí`, `Completar: No`, etc.).
-4. On click, frontend injects `_decisionTomada: <opcion>` into submitted `formData`.
-5. Backend evaluates SpEL conditions on decision links (for example `#_decisionTomada == 'Sí'`) and advances only through the matching branch (or `default` fallback).
+## 5. Colaboracion en tiempo real
 
-## Container Communication (Docker)
+- Cliente publica a `/app/policy/{policyId}/change`.
+- Backend retransmite a `/topic/policy.{policyId}`.
+- Eventos usados:
+  - `add`, `remove`, `move`, `cell-sync`, `full-sync`.
+- Estrategia:
+  - Cambios de celdas se propagan incrementalmente.
+  - Cambios de lanes usan `full-sync` para evitar divergencia de layout.
 
-- `frontend` (Nginx): exposes `:4200` -> serves Angular.
-- `backend` (Spring): exposes `:8080` -> REST/GraphQL/WebSocket.
-- `bpmn-ai-engine` (FastAPI): exposes `:8010` -> IA copilot and diagram assistant.
-- `rabbitmq`: exposes `:5672` (`STOMP relay`) and `:15672` (`management UI`).
-- MongoDB is currently external via `MONGODB_URI` (Atlas/self-managed).
+## 6. Copilot y agente IA
 
-Nginx reverse proxy routes:
+- Chat:
+  - Frontend -> `POST /api/copilot/chat` (Spring)
+  - Spring -> `POST /api/ai/copilot-chat` (FastAPI)
+  - Historial por usuario/politica en `copilot_conversations`.
+- Apply:
+  - Frontend -> `POST /api/copilot/apply`
+  - Spring -> `POST /api/v1/agent/diagram`
+  - Agente IA:
+    - genera parche o diagrama
+    - fusiona con base si instruccion no destructiva
+    - sanitiza nodos/enlaces/lanes
 
-- `/api/*` -> `backend:8080/api/*`
-- `/graphql` -> `backend:8080/graphql`
-- `/ws-designer` -> `backend:8080/ws-designer` (WebSocket Upgrade enabled)
+## 7. Seguridad
 
-All services share network `bpmn-net`.
+- Autenticacion por token bearer.
+- Roles principales:
+  - `SOFTWARE_ADMIN`
+  - `COMPANY_ADMIN`
+  - `FUNCTIONARY`
+  - `CLIENT`
+- Reglas clave:
+  - `CLIENT` usa mobile para login operativo.
+  - Inicio de procesos limitado por `startLaneId` y area/lane del usuario.
 
-## BPMN AI Microservice
+## 8. Catalogo de metodos clave
 
-- Service: `bpmn-ai-engine` (FastAPI).
-- Main endpoints:
-  - `POST /api/v1/agent/diagram` with:
-    - `operation`: `create | modify`
-    - `instruction`
-    - `current_diagram` (required for `modify`)
-    - `lanes`, `context`
-  - `POST /api/ai/copilot-chat` with:
-    - `userMessage`
-    - `currentDiagram` (snapshot de `graph.toJSON()` de JointJS)
-- Health endpoint:
-  - `GET /health`
-- Output:
-  - for `/api/v1/agent/diagram`: updated `diagram` (`cells`) + `summary`, `changes`, `warnings`.
-  - for `/api/ai/copilot-chat`: `message` + `suggested_actions`.
-- Fallback behavior:
-  - if OpenAI credentials are not configured, service returns sanitized/default diagram payload.
+### Frontend
+- `PolicyDesignerComponent`:
+  - `initializeResponsiveCanvas`
+  - `onCanvasWheel`
+  - `startCanvasPanning`, `stopCanvasPanning`
+  - `syncLanesFromCanvas`, `broadcastLaneLayoutSync`
+  - `sendToCopilot`, `resolveCopilotDiagram`, `mergeGraphCells`
+- `DiagramCanvasService`:
+  - `createGraph`, `createPaper`, `createShape`, `createLink`
+  - `renderLaneBackgrounds`, `renderPolicy`, `getPersistedGraphJSON`
+  - `recalculateLanePositions`, `getLaneIdByX`, `updateLinkCondition`
+- `PolicyDataService`:
+  - `getPolicyById`, `updatePolicyDiagram`, `getTaskExecutionOrder`
+- `WebSocketService`:
+  - `connect`, `subscribeToPolicy`, `sendMessage`
+- `CopilotService`:
+  - `sendMessage`, `getHistoryByPolicy`, `applyChange`
 
-### Gateway Integration
+### Backend
+- `PolicyService`:
+  - `createPolicy`, `getPolicyById`, `updatePolicyGraph`, `getTaskExecutionOrder`
+  - `getStartablePoliciesForUser`, `canUserStartPolicy`
+- `WorkflowEngine`:
+  - `getNextNodes`, `getNodeName`, `getFormSchemaForNode`, `getIncomingNodeIds`
+- `ProcessExecutionService`:
+  - `startProcess`, `completeTask`, `startTask`, `getMyTasks`, `getTaskDetail`
+- `CopilotService`:
+  - `chat`, `getConversationHistory`, `apply`
+- `DesignerSocketController`:
+  - `handlePolicyChange`
 
-- Frontend Angular consume:
-  - `POST /api/copilot/chat` (Spring Boot)
-- Spring Boot reenvía a:
-  - `POST http://bpmn-ai-engine:8010/api/ai/copilot-chat` (en Docker network)
+### IA (FastAPI)
+- `DiagramAgentService`:
+  - `process`, `_run_llm`, `_merge_diagrams`, `_fallback_result`
+- `diagram_tools.py`:
+  - `sanitize_diagram`, `create_default_diagram`
 
-## Copilot Chat History
+## 9. Riesgos y notas tecnicas
 
-- Persistencia en MongoDB (`copilot_conversations`) por usuario y politica.
-- Endpoints:
-  - `POST /api/copilot/chat` guarda mensajes y respuesta de IA.
-  - `GET /api/copilot/history?policyId={id}` recupera historial previo.
-- El gateway incluye historial reciente como `conversation_history` al motor IA.
-
-## Notes for ECS/Fargate
-
-- Do not hardcode secrets; inject from Secrets Manager/SSM.
-- Keep S3 bucket private and use presigned URLs.
-- Run RabbitMQ as managed broker/cluster in production.
-- Use managed Mongo service (DocumentDB/MongoDB Atlas) for persistence.
+- Consistencia cross-browser depende de persistir y sincronizar `lane.x` y `lane.width`.
+- Cambios IA no destructivos deben fusionarse, no reemplazar diagrama completo.
+- Si un enlace referencia nodos inexistentes, el saneamiento lo elimina.
+- Validar siempre que el backend y schema GraphQL expongan `Lane.width`.

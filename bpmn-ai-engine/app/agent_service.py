@@ -113,69 +113,80 @@ class DiagramAgentService:
         return {"cells": merged_cells}
 
     def _run_llm(self, request: AgentRequest, base_diagram: Dict[str, Any]) -> Dict[str, Any]:
-        system_prompt = f"""Eres el motor de Inteligencia Artificial de un modelador corporativo BPMN en Angular usando JointJS.
-Tu objetivo es traducir las instrucciones del usuario en un diagrama JSON ESTRICTAMENTE VÁLIDO.
+        system_prompt = f"""Eres el motor de Inteligencia Artificial de un modelador corporativo BPMN en Angular.
+Tu objetivo es traducir las instrucciones del usuario en un JSON ESTRICTAMENTE VÁLIDO. 
+El diagrama NO es solo visual, es procesado por un WorkflowEngine en Spring Boot, por lo que los atributos personalizados son de vida o muerte.
 
-REGLA 1: ESTRUCTURA EXACTA DEL JSON DE JOINTJS
-Si te equivocas en el formato, el lienzo se rompe o los nodos se ven minúsculos.
-- 'size' SIEMPRE debe ser un objeto: "size": {{"width": 140, "height": 70}}
-- 'position' SIEMPRE debe ser un objeto: "position": {{"x": 100, "y": 200}}
-- 'source' y 'target' en los enlaces SIEMPRE deben ser objetos: "source": {{"id": "nodo_1"}}
+REGLA 1: ATRIBUTOS RAÍZ OBLIGATORIOS
+CADA nodo que crees DEBE tener en su nivel raíz los siguientes atributos: 'id', 'type', 'nodeType' (ESTRICTO), 'laneId' y 'position'.
 
-REGLA 2: EJEMPLOS ESTRICTOS DE CELDAS (NODOS)
-CADA nodo que crees DEBE ser un objeto dentro de la lista "cells" y seguir este formato estricto:
+REGLA 2: ESTRUCTURA EXACTA DE NODOS (CELDAS)
+Copia esta estructura para cada tipo. NUNCA omitas el 'nodeType' ni el 'nodeMeta'. ¡NO crees celdas para los carriles (lanes), esos van en un objeto separado!
 
-Ejemplo de Tarea (TASK):
+- TAREA (TASK):
 {{
-  "type": "standard.Rectangle",
-  "id": "task_1",
-  "position": {{"x": 300, "y": 150}},
-  "size": {{"width": 140, "height": 70}},
-  "z": 10,
-  "laneId": "id_del_carril_real",
-  "attrs": {{
-    "body": {{"fill": "#eff6ff", "stroke": "#3b82f6", "rx": 8, "ry": 8}},
-    "label": {{"text": "Nombre Tarea", "fill": "#1e3a8a", "textWrap": {{"width": 120}}}}
-  }},
-  "nodeMeta": {{"taskForm": {{"title": "", "description": "", "fields": [], "attachments": []}}}}
+  "type": "standard.Rectangle", "id": "task_1", "nodeType": "TASK", "laneId": "id_del_carril",
+  "position": {{"x": 100, "y": 100}}, "size": {{"width": 140, "height": 70}}, "z": 10,
+  "attrs": {{ "body": {{"fill": "#eff6ff", "stroke": "#3b82f6", "rx": 8, "ry": 8}}, "label": {{"text": "Nombre Tarea", "fill": "#1f2937", "textWrap": {{"width": 120}}}} }},
+  "nodeMeta": {{ "taskForm": {{"title": "","description": "","fields": [],"attachments": []}} }}
 }}
 
-Otros nodos (solo cambia 'type', 'size' y 'attrs'):
-- Inicio (START): type "standard.Circle", size {{"width": 80, "height": 80}}, attrs.body {{"fill": "#d1fae5", "stroke": "#10b981"}}
-- Fin (END): type "standard.Circle", size {{"width": 90, "height": 90}}, attrs.body {{"fill": "#fee2e2", "stroke": "#ef4444", "strokeWidth": 4}}
-- Decisión (DECISION): type "standard.Polygon", size {{"width": 120, "height": 120}}, attrs.body {{"refPoints": "0,60 60,0 120,60 60,120", "fill": "#fbbf24"}}
-- Bifurcación (FORK): type "standard.Rectangle", size {{"width": 20, "height": 160}}, attrs.body {{"fill": "#1f2937", "stroke": "#1f2937", "rx": 0, "ry": 0}}
-- Sincronización (JOIN/SYNC): type "standard.Rectangle", size {{"width": 20, "height": 160}}, attrs.body {{"fill": "#1f2937", "stroke": "#1f2937", "rx": 0, "ry": 0}}
-
-REGLA 3: ENLACES (LINKS) OBLIGATORIOS
-Para conectar los pasos, DEBES crear celdas de enlace al final de la lista "cells":
+- DECISIÓN (DECISION):
 {{
-  "type": "standard.Link",
-  "id": "link_1",
-  "source": {{"id": "origen_id"}},
-  "target": {{"id": "destino_id"}},
-  "z": 0,
-  "router": {{"name": "orthogonal", "args": {{"padding": 30}}}},
-  "connector": {{"name": "straight"}},
-  "attrs": {{
-    "line": {{"stroke": "#0f172a", "strokeWidth": 2, "targetMarker": {{"type": "path", "d": "M 10 -5 0 0 10 5 z"}}}}
-  }}
+  "type": "standard.Polygon", "id": "dec_1", "nodeType": "DECISION", "laneId": "id_del_carril",
+  "position": {{"x": 300, "y": 100}}, "size": {{"width": 120, "height": 120}}, "z": 10,
+  "attrs": {{ "body": {{"fill": "#fffbeb", "stroke": "#d97706", "refPoints": "0,60 60,0 120,60 60,120"}}, "label": {{"text": "¿Pregunta?"}} }},
+  "nodeMeta": {{ "decisionExpression": "" }}
 }}
-IMPORTANTE: Si la flecha sale de un nodo DECISION, agrégale esta propiedad al enlace:
-"labels": [ {{"position": 0.5, "attrs": {{"text": {{"text": "Sí/No"}}}}}} ]
 
-REGLA 4: COORDENADAS DINÁMICAS Y CARRILES (SWIMLANES)
-¡Los carriles varían por empresa! Lee el array 'lanes' que viene en el payload del usuario.
-- Lógica Vertical (Y): Determina a qué carril pertenece la tarea. Ubica la posición de ese carril en el array (índice 0, 1, 2, etc.). Usa esta fórmula mental: (índice_del_carril * 250) + 100.
-  Ejemplo: El carril en el índice 0 del array va en "y": 100. El carril en el índice 1 va en "y": 350. El carril en el índice 2 va en "y": 600. 
-  Asigna SIEMPRE el "laneId" exacto con el ID del objeto lane correspondiente.
-- Lógica Horizontal (X): Incrementa la 'x' en 200 píxeles por cada nuevo paso en el flujo (ej: Paso 1 en x:100, Paso 2 en x:300, Paso 3 en x:500) para que el diagrama avance hacia la derecha de forma limpia.
+- BIFURCACIÓN (FORK):
+{{
+  "type": "standard.Rectangle", "id": "fork_1", "nodeType": "FORK", "laneId": "id_del_carril",
+  "position": {{"x": 500, "y": 100}}, "size": {{"width": 20, "height": 160}}, "z": 10,
+  "attrs": {{ "body": {{"fill": "#000000", "rx": 0, "ry": 0}}, "label": {{"text": "Bifurcación", "fill": "#ffffff"}} }}
+}}
+
+- SINCRONIZACIÓN (JOIN):
+{{
+  "type": "standard.Rectangle", "id": "join_1", "nodeType": "JOIN", "laneId": "id_del_carril",
+  "position": {{"x": 700, "y": 100}}, "size": {{"width": 160, "height": 20}}, "z": 10,
+  "attrs": {{ "body": {{"fill": "#374151", "stroke": "#374151", "rx": 0, "ry": 0}}, "label": {{"text": "Sincronización", "fill": "#ffffff"}} }}
+}}
+
+- INICIO (START): type: "standard.Circle", nodeType: "START", size: {{"width": 80, "height": 80}}, attrs.body: {{"fill": "#d1fae5", "stroke": "#10b981"}}
+- FIN (END): type: "standard.Circle", nodeType: "END", size: {{"width": 90, "height": 90}}, attrs.body: {{"fill": "#fee2e2", "stroke": "#ef4444", "strokeWidth": 4}}
+
+REGLA 3: ENLACES Y DECISIONES OBLIGATORIAS
+Todo enlace debe conectar "source": {{"id": "origen"}} con "target": {{"id": "destino"}}.
+IMPORTANTE: Si la flecha sale de un nodo 'DECISION', DEBES obligatoriamente incluir la condición SpEL para el motor:
+{{
+  "type": "standard.Link", "id": "link_dec", "z": 0,
+  "source": {{"id": "id_decision"}}, "target": {{"id": "id_destino"}},
+  "conditionLabel": "Sí",
+  "condition": {{ "type": "expression", "script": "#_decisionTomada == 'Sí'" }},
+  "labels": [ {{ "position": 0.5, "attrs": {{ "text": {{"text": "Sí"}} }} }} ],
+  "router": {{"name": "orthogonal", "args": {{"padding": 30}}}}, "connector": {{"name": "straight"}}
+}}
+Si no sale de una decisión, omite 'condition', 'conditionLabel' y 'labels'.
+
+# ... (Reglas 1, 2 y 3 se mantienen idénticas) ...
+
+REGLA 4: COORDENADAS DE NODOS Y METADATOS DE CARRILES (COLUMNAS VERTICALES)
+¡Los carriles varían por empresa y son COLUMNAS VERTICALES! Lee el array 'lanes'.
+1. METADATOS DE CARRILES: Llena el array "lanes_layout" en la raíz del JSON. Por cada carril activo, añade un objeto estricto con 'id', 'name', 'x' y 'width'. 
+   Fórmula de Carril: El 'width' estándar es 600. El 'x' del carril es: (índice_del_carril * 600).
+2. UBICACIÓN HORIZONTAL DE NODOS (X): Para que el nodo quede visualmente dentro de su carril, su posición X debe ser: (índice_del_carril * 600) + 200. Asigna SIEMPRE el "laneId" correcto a la tarea.
+3. UBICACIÓN VERTICAL (Y): Incrementa la coordenada 'y' en 150 píxeles por cada nuevo paso en el flujo (el diagrama avanza de arriba hacia abajo). Si hay tareas en paralelo (FORK), ponlas en la misma coordenada 'y' pero en la 'x' de sus respectivos carriles.
 
 Devuelve SOLO un JSON con esta estructura exacta:
 {{
   "summary": "Resumen en texto",
   "changes": ["Cambio 1", "Cambio 2"],
   "warnings": [],
+  "lanes": [
+    {{ "id": "id_del_carril", "name": "Nombre Carril","color":"#EEF9F1", "x": 0, "width": 600 }},
+    {{ "id": "otro_carril", "name": "Otro Carril", "color":"#EEF9F1", "x": 600, "width": 600 }}
+  ],
   "diagram": {{ "cells": [ /* Aquí van TODOS los nodos y enlaces */ ] }}
 }}
 """
@@ -212,25 +223,39 @@ Devuelve SOLO un JSON con esta estructura exacta:
                 raise last_error
             raise RuntimeError("La IA no devolvio contenido.")
         
-        # Limpieza de markdown usando replace para evitar cortes
-        if "```json" in raw_text:
-            raw_text = raw_text.replace("```json", "", 1)
-        if "```" in raw_text:
-            raw_text = raw_text.replace("```", "")
-        raw_text = raw_text.strip()
+        # --- NUEVA EXTRACCIÓN DE JSON BLINDADA ---
+        start_idx = raw_text.find('{')
+        end_idx = raw_text.rfind('}')
+        
+        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+            # Cortamos exactamente desde donde empieza hasta donde termina el objeto
+            clean_json_str = raw_text[start_idx:end_idx+1]
+        else:
+            clean_json_str = raw_text
 
-        parsed = json.loads(raw_text)
+        try:
+            parsed = json.loads(clean_json_str)
+        except Exception as exc:
+            # Si aún así falla, lanzamos un error claro para el log
+            raise RuntimeError(f"Error parseando JSON: {exc}. Texto recibido: {clean_json_str}")
+
         if "diagram" not in parsed:
             raise RuntimeError("La IA no retornó la clave 'diagram'.")
+            
         return parsed
 
     def _fallback_result(self, request: AgentRequest, base_diagram: Dict[str, Any]) -> AgentResult:
-        diagram, warnings = sanitize_diagram(base_diagram, [lane.model_dump() for lane in request.lanes])
+        # Extraemos los carriles originales enviados por el Frontend
+        original_lanes = [lane.model_dump() for lane in request.lanes]
+        
+        diagram, warnings = sanitize_diagram(base_diagram, original_lanes)
         summary = "Modo fallback: Se mantuvo el diagrama original ante un error."
+        
         return AgentResult(
             operation=request.operation,
             summary=summary,
             changes=["Saneamiento de seguridad aplicado."],
             warnings=warnings,
             diagram=diagram,
+            lanes=original_lanes  # <--- Añadimos los carriles intactos para que no se borren en el frontend
         )

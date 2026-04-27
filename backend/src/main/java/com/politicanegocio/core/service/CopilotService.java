@@ -45,8 +45,8 @@ public class CopilotService {
         this.copilotConversationRepository = copilotConversationRepository;
 
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(10000);
-        factory.setReadTimeout(60000);
+        factory.setConnectTimeout(20000);
+        factory.setReadTimeout(120000);
 
         this.restClient = RestClient.builder()
                 .baseUrl(aiEngineBaseUrl)
@@ -87,6 +87,13 @@ public class CopilotService {
             aiPayload.put("userMessage", userMessage);
             aiPayload.put("currentDiagram", request.currentDiagram() == null ? Map.of() : request.currentDiagram());
             aiPayload.put("history", historyForAi);
+            
+            // ---> NUEVO: PASAMOS LOS CARRILES Y EL CONTEXTO A PYTHON <---
+            aiPayload.put("lanes", request.lanes() == null ? List.of() : request.lanes());
+            if (request.context() != null && !request.context().isBlank()) {
+                aiPayload.put("context", request.context()); 
+            }
+            // -------------------------------------------------------------
 
             CopilotResponseDto aiResponse = restClient.post()
                     .uri("/api/ai/copilot-chat")
@@ -211,7 +218,7 @@ public class CopilotService {
         return toConversationDto(conversation);
     }
 
-    public CopilotApplyResponseDto apply(CopilotApplyRequestDto request) {
+   public CopilotApplyResponseDto apply(CopilotApplyRequestDto request) {
         String requestId = UUID.randomUUID().toString();
         if (request == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request vacio para apply.");
@@ -224,17 +231,22 @@ public class CopilotService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "currentDiagram es obligatorio.");
         }
 
-        Map<String, Object> payload = Map.of(
-                "operation", "modify",
-                "instruction", instruction,
-                "current_diagram", request.currentDiagram(),
-                "lanes", request.lanes() == null ? java.util.List.of() : request.lanes(),
-                "context", request.context() == null ? Map.of() : request.context()
-        );
+        // ---> CORRECCIÓN ARQUITECTÓNICA: Usamos HashMap para evitar NullPointerExceptions <---
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("operation", "modify");
+        payload.put("instruction", instruction);
+        payload.put("current_diagram", request.currentDiagram());
+        payload.put("lanes", request.lanes() == null ? java.util.List.of() : request.lanes());
+        
+        // Protegemos el context asumiendo que es un String como en el chat
+        if (request.context() != null && !request.context().toString().isBlank()) {
+            payload.put("context", request.context());
+        }
+        // ----------------------------------------------------------------------------------
 
         try {
             CopilotApplyResponseDto response = restClient.post()
-                    .uri("/api/v1/agent/diagram")
+                    .uri("/api/v1/agent/diagram") // <-- IMPORTANTE: Verifica que esta sea la URL correcta de tu Python
                     .header("X-Request-Id", requestId)
                     .body(payload)
                     .retrieve()

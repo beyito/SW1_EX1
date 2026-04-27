@@ -1,320 +1,331 @@
 # PROJECT AI CONTEXT
 
+Este archivo es el contexto maestro para cualquier IA que deba trabajar en este repositorio.
+
 ## 1) Resumen ejecutivo
-Proyecto BPMN colaborativo multi-cliente con 3 aplicaciones:
-- `backend/`: API principal (Spring Boot + MongoDB + WebSocket STOMP + S3).
-- `frontend/`: panel web administrativo y de ejecucion interna (Angular + JointJS).
-- `mobile/`: app Flutter para clientes (`CLIENT`) para iniciar tramites y gestionar tareas.
 
-Dominio principal:
-- Diseno de politicas de negocio en BPMN (lienzo JointJS).
-- Ejecucion de procesos e instancias de tareas.
-- Colaboracion en tiempo real en el disenador via WebSockets.
-- Adjuntos en formularios via AWS S3.
+Sistema BPMN empresarial colaborativo con 4 piezas principales:
+- `frontend` Angular: disenador JointJS, colaboracion en tiempo real, copilot.
+- `backend` Spring Boot: REST, GraphQL, WebSocket, motor de ejecucion BPMN, S3.
+- `bpmn-ai-engine` FastAPI: chat BPMN + modificacion automatica de diagramas.
+- `mobile` Flutter: canal cliente para iniciar procesos y gestionar tareas.
 
----
+Objetivo de negocio:
+- Disenar politicas BPMN por empresa.
+- Ejecutar procesos y tareas por carril/area.
+- Mantener colaboracion multiusuario en vivo.
+- Asistir con IA sin romper consistencia del diagrama.
 
 ## 2) Estructura del repositorio
-- `backend/` -> API Spring Boot.
-- `frontend/` -> Angular app (`flow-web`).
-- `mobile/` -> Flutter app para cliente final.
-- `infra/` -> `docker-compose.yml` e infraestructura local.
 
-Documentacion existente:
-- `ARCHITECTURE.md`
-- `ARQUITECTURA_PROYECTO.md`
-- otros md historicos de cambios.
+```text
+c:/SW1_EX1
+|- backend/
+|- frontend/
+|- bpmn-ai-engine/
+|- mobile/
+|- infra/
+|- ARCHITECTURE.md
+|- FUNCIONALIDADES_Y_CU.md
+|- COMUNICACION_SERVICIOS.md
+`- PROJECT_AI_CONTEXT.md
+```
 
-Este archivo es el contexto consolidado y actualizado para agentes IA.
-
----
-
-## 3) Stack tecnologico
+## 3) Stack tecnico
 
 ### Backend
 - Java 17
-- Spring Boot (parent `4.0.5`)
-- Spring Web + WebSocket + Security + GraphQL
-- Spring Data MongoDB
-- STOMP broker relay con RabbitMQ
-- AWS SDK v2 (S3)
-- Lombok
+- Spring Boot
+- Spring Security
+- Spring GraphQL
+- Spring WebSocket (STOMP)
+- MongoDB
+- AWS S3 SDK
 
-Dependencias clave: `backend/pom.xml`.
+### Frontend
+- Angular standalone
+- `@joint/plus`
+- `@stomp/stompjs`
 
-### Frontend web
-- Angular 21 standalone
-- JointJS Plus (`@joint/plus`) para el lienzo BPMN
-- STOMP JS (`@stomp/stompjs`) para colaboracion en tiempo real
+### IA
+- FastAPI + Pydantic
+- OpenAI Python SDK
 
 ### Mobile
-- Flutter (Dart)
-- `dio` para HTTP
-- `flutter_secure_storage` para token
-- `flutter_dotenv` para config
-- `file_picker` para adjuntos locales
+- Flutter + Dio
 
-### Infra local
-- Docker Compose con:
-  - frontend (nginx)
-  - backend
-  - rabbitmq (management + plugin stomp)
-  - postgres (simulacion local; no es la DB principal actual)
+## 4) Dominio y modelos clave
 
----
+### Politica
+- `Policy`: `id`, `name`, `description`, `diagramJson`, `lanes`, `startLaneId`.
+- `Lane`: `id`, `name`, `color`, `x`, `width`.
 
-## 4) Persistencia y modelos de datos
+### Diagrama (JointJS)
+- `cells` con nodos y enlaces.
+- Nodos deben tener:
+  - `id`, `type`, `nodeType`, `position`.
+- Tipos `nodeType` permitidos:
+  - `START`, `TASK`, `DECISION`, `FORK`, `JOIN`, `SYNCHRONIZATION`, `END`.
+- Enlaces de decision:
+  - `condition.type` (`expression`/`default`)
+  - `condition.script` (SpEL)
+  - `conditionLabel`.
 
-### DB principal actual
-- MongoDB (`spring.mongodb.uri`)
+### Ejecucion
+- `ProcessInstance`: proceso activo/completado.
+- `TaskInstance`: tarea con `taskId`, `laneId`, `status`, `assignedTo`, `formData`.
 
-### Colecciones principales
-- `users`
-- `areas`
-- `companies`
-- `policies`
-- `process_instances`
-- `task_instances`
+## 5) Roles y reglas de autorizacion
 
-### Entidades clave
-- `User`: `username`, `roles`, `company`, `area`, `laneId`.
-- `Policy`: `diagramJson`, `startLaneId`, metadatos de empresa.
-- `ProcessInstance`: `policyId`, `startedBy`, `status`.
-- `TaskInstance`: `processInstanceId`, `taskId`, `laneId`, `status`, `formData`.
+- Roles:
+  - `SOFTWARE_ADMIN`
+  - `COMPANY_ADMIN`
+  - `FUNCTIONARY`
+  - `CLIENT`
+- Reglas:
+  - `CLIENT` opera principalmente por mobile.
+  - Inicio de proceso validado por `startLaneId` y lane del usuario.
+  - Acceso a tarea: por lane o asignacion, segun rol.
 
----
+## 6) Arquitectura de comunicacion
 
-## 5) Roles y reglas de negocio
-Roles usados en el sistema:
-- `SOFTWARE_ADMIN`
-- `COMPANY_ADMIN`
-- `FUNCTIONARY`
-- `CLIENT`
+### Frontend -> Backend
+- GraphQL `/graphql`: politicas + tareas.
+- REST `/api/*`: auth, admin, execution, files, metrics, copilot.
+- WebSocket `/ws-designer`:
+  - publish `/app/policy/{policyId}/change`
+  - subscribe `/topic/policy.{policyId}`.
 
-Reglas importantes vigentes:
-- Cada empresa tiene area `Cliente` por defecto.
-- `FUNCTIONARY` debe pertenecer a un area distinta de `Cliente`.
-- `CLIENT` se administra separado y pertenece al area `Cliente`.
-- Canonico de carril cliente: **`Cliente`**.
-  - Internamente hay normalizacion para compatibilidad con legado `lane_cliente` en lectura/creacion de tareas.
+### Backend -> IA
+- `POST /api/ai/copilot-chat`
+- `POST /api/v1/agent/diagram`
 
----
+### Backend -> externos
+- MongoDB.
+- S3 para uploads.
+- RabbitMQ para relay STOMP.
 
-## 6) Seguridad y autenticacion
+## 7) Catalogo de metodos (fuente de verdad del comportamiento)
 
-### Auth
-- Endpoints REST: `/api/auth/login`, `/api/auth/mobile/login`, `/api/auth/register`, `/api/auth/me`.
-- Token actual: no JWT firmado; token en memoria (`TokenService`, UUID con expiracion 6h).
-- `AuthTokenFilter` resuelve `Bearer` y carga `User` en `SecurityContext`.
+## 7.1 Frontend: servicios
 
-### Nota critica
-- El modelo actual de token en memoria no es ideal para multi-instancia/produccion porque no es distribuido ni persistente.
+### `PolicyDataService`
+- `getAllPolicies()`
+- `getPolicyById(id)`
+- `createPolicy(name, description)`
+- `updatePolicyDiagram(policyId, diagramJson, lanes)`
+- `getTaskExecutionOrder(policyId)`
+- fallback de compatibilidad: `getPolicyByIdWithoutWidth(id)`.
 
-### CORS y autorizacion
-- Config en `SecurityConfig`.
-- `@EnableMethodSecurity` y `@PreAuthorize` en endpoints criticos.
+### `DiagramCanvasService`
+- Creacion:
+  - `createGraph()`
+  - `createPaper(graph)`
+  - `createShape(type, label, x, y)`
+  - `createLink(source, target, condition?)`
+- Lanes y render:
+  - `renderLaneBackgrounds(graph, lanes)`
+  - `renderPolicy(graph, policy, lanes)`
+  - `recalculateLanePositions(lanes)`
+  - `getLaneIdByX(lanes, x)`
+- Persistencia/sanitizado:
+  - `getPersistedGraphJSON(graph)`
+  - `sanitizeGraphJSON(graphJson)`
+- Edicion:
+  - `updateNodeLabel(...)`
+  - `updateLinkCondition(...)`
+  - `deleteElement(...)`.
 
----
+### `WebSocketService`
+- `connect()`
+- `disconnect()`
+- `subscribeToPolicy(policyId, callback)`
+- `sendMessage(policyId, event)`.
 
-## 7) Backend - modulos funcionales
+### `CopilotService` (frontend)
+- `sendMessage(userText, currentDiagram, options)`
+- `getHistoryByPolicy(policyId)`
+- `applyChange(instruction, currentDiagram, lanes, context)`.
 
-### 7.1 Administracion (`/api/admin`)
-Controlador: `AdminController`.
-- Empresas: crear/listar.
-- Company admins: CRUD.
-- Areas: CRUD.
-- Funcionarios: CRUD.
-- Clientes: CRUD.
+### `CompanyAreaService`
+- `getCompanyAreas()`.
 
-Servicio: `AdminService` (validaciones de unicidad y reglas por rol).
+### `FileService`
+- `uploadAttachment(file, policyId?)`.
 
-### 7.2 Politicas BPMN
-Servicio: `PolicyService`.
-Funciones clave:
-- Crear politica.
-- Guardar/actualizar grafo (`diagramJson`).
-- Determinar `startLaneId` (parser BPMN/JSON).
-- Listar politicas iniciables segun usuario/rol.
+## 7.2 Frontend: componente principal del disenador
 
-Parser: `BpmnStartLaneParser`.
+### `PolicyDesignerComponent` metodos funcionales criticos
+- Ciclo de vida:
+  - `ngOnInit`, `ngAfterViewInit`, `ngOnDestroy`.
+- Canvas UX:
+  - `initializeResponsiveCanvas`
+  - `onCanvasWheel`
+  - `startCanvasPanning`, `stopCanvasPanning`.
+- Eventos y sync:
+  - `registerPaperEvents`, `registerGraphEvents`
+  - `connectToPolicyTopic`, `handleRemoteEvent`
+  - `applyRemoteMove/add/remove/cellSnapshot/fullSync`.
+- Lanes:
+  - `addLane`, `removeLane`
+  - `syncLanesFromCanvas`
+  - `broadcastLaneLayoutSync`.
+- Persistencia:
+  - `scheduleAutoSave`, `persistPolicyGraph`.
+- IA:
+  - `sendToCopilot`
+  - `applyLaneCommandsFromText`
+  - `resolveCopilotDiagram`
+  - `mergeGraphCells`.
 
-### 7.3 Ejecucion de procesos y tareas (`/api/execution`)
-Controlador: `ProcessExecutionController`.
-Endpoints principales:
-- `POST /process/start`
-- `POST /tasks/{id}/take`
-- `POST /tasks/{id}/complete`
-- `GET /tasks/{id}`
-- `GET /startable-policies`
-- `GET /my-tasks`
-- `GET /client/tasks/pending` (compatibilidad, delega en logica unificada)
+## 7.3 Backend: controladores
 
-Servicio: `ProcessExecutionService`.
-Incluye:
-- Motor de avance recursivo (fork/join/end).
-- Creacion de `TaskInstance` pendientes.
-- Mapeo a DTOs de bandeja.
-- Validaciones de acceso por tarea (`assertUserCanAccessTask`).
+### GraphQL
+- `PolicyGraphQLController`
+  - `createPolicy`
+  - `getAllPolicies`
+  - `getPolicyById`
+  - `getTaskExecutionOrder`
+  - `updatePolicyGraph`.
+- `ExecutionGraphQLController`
+  - `myTasks`
+  - `getTaskDetail`
+  - `takeTask`
+  - `completeTask`.
 
-### 7.4 Upload de archivos a S3
-Controlador: `FileUploadController`.
-- `POST /api/files/upload` multipart (`file`, opcional `policyId`).
+### REST
+- `AuthController`
+  - `register`, `login`, `loginMobile`, `me`.
+- `AdminController`
+  - CRUD empresas/admins/areas/funcionarios/clientes.
+- `ProcessExecutionController`
+  - `startProcess`, `takeTask/startTask`, `completeTask`
+  - `getTaskDetail`, `getMyTasks`, `getMyProcessTaskGroups`
+  - `getStartablePolicies`, `getClientPendingTasks`.
+- `CopilotController`
+  - `chat`, `history`, `apply`.
+- `FileUploadController`
+  - `upload`.
+- `MetricsController`
+  - `getPolicyMetrics`.
 
-Servicio: `S3Service`.
+### WebSocket
+- `DesignerSocketController.handlePolicyChange`.
 
-### 7.5 WebSockets colaborativos
-Config: `WebSocketConfig`.
-- Endpoints STOMP: `/ws-designer`, `/ws-bpmn`.
-- App prefix: `/app`.
-- Broker relay RabbitMQ: `/topic`, `/queue`.
+## 7.4 Backend: servicios
 
-Controller socket: `DesignerSocketController`.
-- Entrada: `/app/policy/{policyId}/change`
-- Broadcast: `/topic/policy.{policyId}`
+### `PolicyService`
+- `createPolicy`
+- `getAllPolicies`
+- `getStartablePoliciesForUser`
+- `canUserStartPolicy`
+- `getPolicyById`
+- `updatePolicyGraph` (recalcula `laneId` por posicion + lanes)
+- `getTaskExecutionOrder`.
 
----
+### `WorkflowEngine`
+- `getNextNodes(policyId, currentNodeId[, routingVariables])`
+- `getNodeName`
+- `getFormSchemaForNode`
+- `getIncomingNodeIds`.
 
-## 8) Frontend web (Angular)
+### `ProcessExecutionService`
+- `startProcess`
+- `completeTask`
+- `startTask` / `takeTask`
+- `getPendingTasksForLane`
+- `getMyPendingTasks`
+- `getMyTasks`
+- `getMyProcessTaskGroups`
+- `getClientPendingTasks`
+- `getTaskDetail`
+- motor interno `advanceWorkflow` para `FORK`, `JOIN`, `DECISION`, `END`.
 
-### Routing principal
-Archivo: `frontend/src/app/app.routes.ts`
-- `/login`
-- `/admin-software`
-- `/admin/funcionarios`
-- `/admin/policies`
-- `/designer/:id`
-- `/funcionario-dashboard`
-- `/execution/task/:id`
-- `/bandeja-tareas`
+### `CopilotService` (backend gateway)
+- `chat`
+- `getConversationHistory`
+- `apply`.
 
-### Modulos relevantes
-- Auth/Login
-- Admin software y admin company
-- Policy manager
-- Policy designer (JointJS + STOMP)
-- Execution dashboard e inbox
+## 7.5 IA microservice
 
-### Colaboracion en tiempo real
-- Servicio websocket: `web-socket.service.ts`
-- Suscripcion a `/topic/policy.{policyId}`
-- Publicacion a `/app/policy/{policyId}/change`
+### Endpoints (`main.py`)
+- `GET /health`
+- `POST /api/v1/agent/diagram`
+- `POST /api/ai/copilot-chat`.
 
-### Proxy local
-- `frontend/proxy.conf.json` -> `/api`, `/graphql`, `/ws-designer` hacia `localhost:8080`.
+### `DiagramAgentService`
+- `process(request)`
+- `_run_llm(...)`
+- `_merge_diagrams(...)`
+- `_fallback_result(...)`.
 
----
+### `diagram_tools.py`
+- `create_default_diagram()`
+- `sanitize_diagram(diagram, lanes)`:
+  - corrige/valida nodos
+  - valida `laneId`
+  - elimina enlaces huerfanos.
 
-## 9) Mobile (Flutter)
+## 8) Invariantes de consistencia (muy importantes)
 
-### Config base
-- `main.dart` inicializa `Env`, `ApiClient`, `AuthService`, `DashboardService`, `TaskService`.
-- `app.dart` usa `AuthGate` con `FutureBuilder`.
+1. Nunca persistir fondos de lane en `diagramJson` (solo nodos/enlaces).
+2. Mantener `Lane.x` y `Lane.width` actualizados para evitar drift entre navegadores.
+3. Todo nodo debe tener `nodeType`.
+4. Todo enlace debe apuntar a nodos existentes.
+5. Al aplicar IA:
+   - si instruccion no es destructiva, fusionar con base.
+   - si es destructiva, reemplazo completo permitido.
+6. `DECISION` debe tener condiciones coherentes (`expression/default`) para que el motor enrute correctamente.
 
-### Auth cliente
-- Login via `/api/auth/mobile/login`.
-- Token persistido en `flutter_secure_storage`.
+## 9) Problemas historicos que ya se mitigaron
 
-### Dashboard cliente
-- Lista politicas iniciables (`/api/execution/startable-policies`).
-- Permite iniciar proceso (`/api/execution/process/start`).
-- Navega a bandeja de tareas pendientes.
+- Perdida de diagrama al agregar nodos por IA:
+  - mitigado con merge no destructivo.
+- Lanes duplicados/superpuestos entre navegadores:
+  - mitigado con sincronizacion de geometria + `full-sync`.
+- Error GraphQL de `Lane.width` undefined:
+  - mitigado exponiendo `width` en schema y modelos compatibles.
+- Desfase visual al hacer zoom:
+  - mitigado separando transform de viewport vs coordenadas persistidas.
 
-### Tareas cliente
-Feature path: `mobile/lib/features/tasks/`
-- `models/pending_task_model.dart`
-- `models/task_detail_model.dart`
-- `services/task_service.dart`
-- `screens/pending_tasks_screen.dart`
-- `screens/task_detail_screen.dart`
+## 10) Checklist para cambios futuros
 
-Flujo:
-1. Obtener tareas (`/api/execution/my-tasks`).
-2. Ver detalle (`/api/execution/tasks/{id}`).
-3. Tomar tarea (`/take`).
-4. Subir adjuntos a S3 (`/api/files/upload`).
-5. Completar tarea (`/complete`, `formData` serializado JSON string).
+Antes de tocar el disenador:
+1. Verificar impacto en `PolicyDesignerComponent`, `DiagramCanvasService` y `PolicyService`.
+2. Confirmar que GraphQL schema y frontend models siguen alineados.
+3. Probar colaboracion con 2 navegadores.
+4. Probar persistencia:
+   - mover nodos
+   - redimensionar lanes
+   - guardar, recargar, comparar.
 
-UI reactiva:
-- `FutureBuilder` en bandejas/detalles para evitar pantallas en blanco.
+Antes de tocar IA:
+1. Mantener `nodeType` y estructura de `cells`.
+2. Conservar referencias de `id` al generar enlaces.
+3. Pasar por `sanitize_diagram`.
 
----
+## 11) Comandos utiles de validacion
 
-## 10) Infraestructura y despliegue local
+### Frontend
+```powershell
+Set-Location c:\SW1_EX1\frontend
+npm run build
+```
 
-`infra/docker-compose.yml` levanta:
-- `bpmn-frontend`
-- `bpmn-backend`
-- `bpmn-rabbitmq`
-- `bpmn-postgres`
+### Backend
+```powershell
+Set-Location c:\SW1_EX1\backend
+cmd /c mvnw.cmd -q -DskipTests compile
+```
 
-Variables de entorno backend esperadas:
-- Mongo: `SPRING_DATA_MONGODB_URI` / `MONGODB_URI`
-- RabbitMQ: `SPRING_RABBITMQ_HOST`, `SPRING_RABBITMQ_STOMP_PORT`, `SPRING_RABBITMQ_USERNAME`, `SPRING_RABBITMQ_PASSWORD`
-- S3: `AWS_REGION`, `AWS_S3_BUCKET`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
-- Upload size y otras
+### IA
+```powershell
+Set-Location c:\SW1_EX1\bpmn-ai-engine
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8010
+```
 
----
+## 12) Referencias de documentacion relacionada
 
-## 11) Convenciones y decisiones de arquitectura
-- Canonico lane cliente: `Cliente`.
-- Compatibilidad legado: normalizacion interna para `lane_cliente` en servicios criticos.
-- `TaskInstance.laneId` debe guardar el valor normalizado.
-- Para clientes, aislamiento estricto por `ProcessInstance.startedBy`.
-- Endpoints de tareas tienden a unificarse en `/api/execution/my-tasks` + validaciones de acceso por usuario.
-
----
-
-## 12) Riesgos tecnicos actuales (importante para agentes IA)
-1. `TokenService` en memoria (no distribuido).
-2. Hay mezcla historica REST + GraphQL en ejecucion; revisar ambos al refactorizar firmas.
-3. Mensajes/logs y comentarios con mojibake en algunos archivos (encoding).
-4. Se detectaron credenciales hardcodeadas en `backend/src/main/resources/application.properties`.
-   - Debe migrarse a variables de entorno antes de compartir repo o desplegar.
-
----
-
-## 13) Guia rapida para nuevos agentes IA
-
-Orden recomendado para tocar el sistema sin romper:
-1. Revisar modelos + repositorios de `ProcessInstance`/`TaskInstance`.
-2. Revisar `ProcessExecutionService` (es el core de reglas de ejecucion).
-3. Validar controladores REST y GraphQL en paralelo.
-4. Si hay cambios de lane/roles, validar tambien:
-   - `PolicyService`
-   - `AdminService`
-   - `AuthService`
-   - mobile `TaskService` y `DashboardService`
-5. Ejecutar siempre:
-   - backend compile: `mvnw -q -DskipTests compile`
-   - mobile analyze: `flutter analyze`
-   - frontend build: `npm run build`
-
----
-
-## 14) Comandos utiles
-Backend:
-- `cd backend && mvnw spring-boot:run`
-- `cd backend && mvnw -q -DskipTests compile`
-
-Frontend:
-- `cd frontend && npm install`
-- `cd frontend && npm start`
-- `cd frontend && npm run build`
-
-Mobile:
-- `cd mobile && flutter pub get`
-- `cd mobile && flutter run`
-- `cd mobile && flutter analyze`
-
-Infra:
-- `cd infra && docker compose up --build`
-
----
-
-## 15) Estado funcional actual (alto nivel)
-- Web admin: gestion de empresas, admins, areas, funcionarios y clientes.
-- Disenador BPMN: colaborativo por WebSockets + persistencia.
-- Cliente mobile: login, lista de politicas iniciables, inicio de tramite, bandeja pendiente, detalle de tarea, completar tarea y adjuntos S3.
-- Nuevo microservicio IA BPMN (`bpmn-ai-engine`): asistente para crear/modificar diagramas (`POST /api/v1/agent/diagram`) y copilot contextual por chat (`POST /api/ai/copilot-chat`), consumido desde Spring en `POST /api/copilot/chat`.
-
-Este documento debe actualizarse cada vez que cambien contratos API, reglas de lane/rol o estructura de features.
+- `ARCHITECTURE.md`
+- `FUNCIONALIDADES_Y_CU.md`
+- `COMUNICACION_SERVICIOS.md`

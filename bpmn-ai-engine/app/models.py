@@ -31,6 +31,7 @@ class AgentResult(BaseModel):
     changes: List[str] = Field(default_factory=list)
     warnings: List[str] = Field(default_factory=list)
     diagram: Dict[str, Any]
+    lanes: Optional[List[Dict[str, Any]]] = None
 
 
 class HealthResponse(BaseModel):

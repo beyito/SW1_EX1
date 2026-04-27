@@ -12,6 +12,7 @@ export interface CopilotApplyResponse {
   changes: string[];
   warnings: string[];
   diagram: Record<string, unknown>;
+  lanes?: any[];
 }
 
 export interface CopilotConversationMessage {
@@ -34,6 +35,7 @@ export interface CopilotChatOptions {
   conversationId?: string | null;
   policyId?: string | null;
   policyName?: string | null;
+  context?: string | null;
 }
 
 @Injectable({
@@ -42,10 +44,10 @@ export interface CopilotChatOptions {
 export class CopilotService {
   private readonly authService = inject(AuthService);
   private readonly baseUrl = '/api/copilot';
-
-  public async sendMessage(
+public async sendMessage(
     userText: string,
     currentDiagram: unknown,
+    lanes: any[], // <--- 1. RECIBIMOS LOS CARRILES AQUÍ
     options: CopilotChatOptions = {}
   ): Promise<CopilotResponse> {
     const response = await fetch(`${this.baseUrl}/chat`, {
@@ -54,6 +56,8 @@ export class CopilotService {
       body: JSON.stringify({
         userMessage: userText,
         currentDiagram,
+        lanes, // <--- 2. LOS METEMOS EN EL JSON PARA SPRING BOOT
+        context: options.context ?? null, // <--- 3. ENVIAMOS EL CONTEXTO DE ÁREAS DISPONIBLES
         conversationId: options.conversationId ?? null,
         policyId: options.policyId ?? null,
         policyName: options.policyName ?? null

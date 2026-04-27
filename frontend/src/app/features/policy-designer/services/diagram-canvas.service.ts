@@ -76,49 +76,19 @@ export class DiagramCanvasService {
     const magnetSize = 8;
     const baseOptions = {
       position: { x, y },
-      z: 10,
-      ports: {
-        groups: {
-          'in': {
-            position: { name: 'left' },
-            attrs: {
-              portBody: {
-                magnet: true,
-                r: magnetSize,
-                fill: '#1E3A8A',
-                stroke: '#1E3A8A',
-                strokeWidth: 2,
-                opacity: 0
-              }
-            }
-          },
-          'out': {
-            position: { name: 'right' },
-            attrs: {
-              portBody: {
-                magnet: true,
-                r: magnetSize,
-                fill: '#1E3A8A',
-                stroke: '#1E3A8A',
-                strokeWidth: 2,
-                opacity: 0
-              }
-            }
-          }
-        }
-      },
+      z: 10,     
       attrs: {
         body: {
-          fill: '#ffffff',
-          stroke: '#1E3A8A',
+          fill: '#eff6ff',
+          stroke: '#3b82f6',
           strokeWidth: 2
         },
         label: {
           text: label,
-          fill: '#374151',
+          fill: '#1e3a8a',
           fontSize: 14,
           fontWeight: '600',
-          textWrap: { width: -10, height: -10 }
+          textWrap: { width: 120, height: -10 }
         }
       }
     };
@@ -132,7 +102,8 @@ export class DiagramCanvasService {
           size: { width: 80, height: 80 },
           attrs: {
             ...baseOptions.attrs,
-            body: { ...baseOptions.attrs.body, fill: '#ecfdf5', stroke: '#10B981' }
+            body: { ...baseOptions.attrs.body, fill: '#d1fae5', stroke: '#10b981' },
+            label: { ...baseOptions.attrs.label, text: label, fill: '#064e3b' }
           }
         });
         break;
@@ -147,7 +118,7 @@ export class DiagramCanvasService {
               stroke: '#d97706',
               strokeWidth: 2
             },
-            label: { ...baseOptions.attrs.label, text: label }
+            label: { ...baseOptions.attrs.label, text: label, fill: '#78350f', textWrap: { width: 80, height: -10 } }
           }
         });
         break;
@@ -205,7 +176,8 @@ export class DiagramCanvasService {
           size: { width: 90, height: 90 },
           attrs: {
             ...baseOptions.attrs,
-            body: { ...baseOptions.attrs.body, fill: '#fef2f2', stroke: '#ef4444', strokeWidth: 4 }
+            body: { ...baseOptions.attrs.body, fill: '#fee2e2', stroke: '#ef4444', strokeWidth: 4 },
+            label: { ...baseOptions.attrs.label, text: label, fill: '#7f1d1d' }
           }
         });
         break;
@@ -215,14 +187,12 @@ export class DiagramCanvasService {
           size: { width: 140, height: 70 },
           attrs: {
             ...baseOptions.attrs,
-            body: { ...baseOptions.attrs.body, rx: 12, ry: 12, fill: '#f8fafc', stroke: '#1E3A8A' }
+            body: { ...baseOptions.attrs.body, rx: 8, ry: 8, fill: '#eff6ff', stroke: '#3b82f6' },
+            label: { ...baseOptions.attrs.label, text: label, fill: '#1e3a8a', textWrap: { width: 120, height: -10 } }
           }
         });
     }
 
-    // Add ports to the shape
-    shape.addPort({ id: 'in', group: 'in' });
-    shape.addPort({ id: 'out', group: 'out' });
     shape.set('nodeType', type);
     if (type === 'TASK') {
       shape.set('nodeMeta', {
@@ -249,16 +219,16 @@ export class DiagramCanvasService {
     link.toBack();
     link.attr({
       line: {
-        stroke: '#1E3A8A',
-        strokeWidth: 2.5,
+        stroke: '#0f172a',
+        strokeWidth: 2,
         strokeLinecap: 'round',
         strokeLinejoin: 'round',
         sourceMarker: null, // Sin marcador en el origen
         targetMarker: {
           type: 'path',
           d: 'M 10 -5 0 0 10 5 z',
-          fill: '#1E3A8A',
-          stroke: '#1E3A8A',
+          fill: '#0f172a',
+          stroke: '#0f172a',
           'stroke-width': 1
         }
       }
@@ -274,13 +244,13 @@ export class DiagramCanvasService {
         attrs: {
           text: {
             text: condition,
-            fill: '#1E3A8A',
+            fill: '#0f172a',
             fontSize: 13,
             fontWeight: 'bold'
           },
           rect: {
             fill: '#ffffff',
-            stroke: '#1E3A8A',
+            stroke: '#0f172a',
             strokeWidth: 1,
             rx: 3,
             ry: 3
@@ -291,7 +261,7 @@ export class DiagramCanvasService {
     }
 
     link.router('orthogonal', { padding: 30 });
-    link.connector('straight', { cornerType: 'line' });
+    // link.connector('straight');
     return link;
   }
 
@@ -488,13 +458,13 @@ public renderLaneBackgrounds(graph: dia.Graph, lanes: Lane[]): void {
         attrs: {
           text: {
             text: cleanLabel,
-            fill: '#1E3A8A',
+            fill: '#0f172a',
             fontSize: 13,
             fontWeight: 'bold'
           },
           rect: {
             fill: '#ffffff',
-            stroke: '#1E3A8A',
+            stroke: '#0f172a',
             strokeWidth: 1,
             rx: 3,
             ry: 3
