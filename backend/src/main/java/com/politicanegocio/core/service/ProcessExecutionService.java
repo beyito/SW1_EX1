@@ -15,9 +15,11 @@ import com.politicanegocio.core.model.User;
 import com.politicanegocio.core.repository.PolicyRepository;
 import com.politicanegocio.core.repository.ProcessInstanceRepository;
 import com.politicanegocio.core.repository.TaskInstanceRepository;
+import com.politicanegocio.core.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -26,6 +28,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -42,6 +45,8 @@ public class ProcessExecutionService {
     private final PolicyRepository policyRepository;
     private final WorkflowEngine workflowEngine;
     private final PolicyService policyService;
+    private final UserRepository userRepository;
+    private final FirebaseMessagingService firebaseMessagingService;
     private final ObjectMapper objectMapper;
 
     public ProcessExecutionService(
@@ -50,6 +55,8 @@ public class ProcessExecutionService {
             PolicyRepository policyRepository,
             WorkflowEngine workflowEngine,
             PolicyService policyService,
+            UserRepository userRepository,
+            FirebaseMessagingService firebaseMessagingService,
             ObjectMapper objectMapper
     ) {
         this.processInstanceRepository = processInstanceRepository;
@@ -57,6 +64,8 @@ public class ProcessExecutionService {
         this.policyRepository = policyRepository;
         this.workflowEngine = workflowEngine;
         this.policyService = policyService;
+        this.userRepository = userRepository;
+        this.firebaseMessagingService = firebaseMessagingService;
         this.objectMapper = objectMapper;
     }
 
@@ -728,6 +737,7 @@ public class ProcessExecutionService {
             taskInstance.setStatus(TaskInstanceStatus.PENDING);
             taskInstance.setCreatedAt(LocalDateTime.now());
             taskInstanceRepository.save(taskInstance);
+            notifyUsersAboutNewTask(processInstanceId, node, taskInstance.getLaneId());
             log.info(
                     "createSinglePendingTask: processInstanceId={} taskId={} laneRaw={} laneSaved={}",
                     processInstanceId,
@@ -735,6 +745,78 @@ public class ProcessExecutionService {
                     node.laneId(),
                     taskInstance.getLaneId()
             );
+        }
+    }
+
+    private void notifyUsersAboutNewTask(String processInstanceId, WorkflowEngine.WorkflowNode node, String laneId) {
+        try {
+            String normalizedLane = normalizeLaneId(laneId);
+            if (!CLIENT_AREA_NAME.equalsIgnoreCase(normalizedLane)) {
+                log.debug(
+                        "Push omitido: tarea {} en lane {} (solo se notifica cuando lane=Cliente).",
+                        node != null ? node.nodeId() : "unknown",
+                        normalizedLane
+                );
+                return;
+            }
+
+            ProcessInstance processInstance = processInstanceRepository.findById(processInstanceId).orElse(null);
+            if (processInstance == null) {
+                return;
+            }
+
+            Policy policy = policyRepository.findById(processInstance.getPolicyId()).orElse(null);
+            if (policy == null) {
+                return;
+            }
+
+            String taskName = workflowEngine.getNodeName(policy.getId(), node.nodeId());
+            if (!StringUtils.hasText(taskName)) {
+                taskName = node.nodeLabel();
+            }
+            if (!StringUtils.hasText(taskName)) {
+                taskName = node.nodeId();
+            }
+            final String finalTaskName = taskName;
+
+            String processStarter = processInstance.getStartedBy() == null ? "" : processInstance.getStartedBy().trim();
+
+            Set<String> alreadyNotifiedUsers = new java.util.HashSet<>();
+
+            if (StringUtils.hasText(processStarter)) {
+                userRepository.findByUsernameIgnoreCase(processStarter).ifPresent(user -> {
+                    if (StringUtils.hasText(user.getFcmToken())) {
+                        firebaseMessagingService.sendTaskAssignedNotification(user.getFcmToken(), finalTaskName);
+                        alreadyNotifiedUsers.add(user.getUsername());
+                    }
+                });
+            }
+
+            if (!StringUtils.hasText(normalizedLane) || !StringUtils.hasText(policy.getCompanyId())) {
+                return;
+            }
+
+            List<User> companyUsers = userRepository.findByCompany(policy.getCompanyId());
+            for (User user : companyUsers) {
+                String username = user.getUsername() == null ? "" : user.getUsername().trim();
+                if (!StringUtils.hasText(username) || alreadyNotifiedUsers.contains(username)) {
+                    continue;
+                }
+
+                String userLane = resolveUserLaneId(user);
+                if (!Objects.equals(userLane, normalizedLane)) {
+                    continue;
+                }
+
+                if (!StringUtils.hasText(user.getFcmToken())) {
+                    continue;
+                }
+
+                firebaseMessagingService.sendTaskAssignedNotification(user.getFcmToken(), finalTaskName);
+                alreadyNotifiedUsers.add(username);
+            }
+        } catch (Exception exception) {
+            log.warn("No se pudo notificar la nueva tarea por push.", exception);
         }
     }
 

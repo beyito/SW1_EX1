@@ -155,3 +155,10 @@
 - Cambios IA no destructivos deben fusionarse, no reemplazar diagrama completo.
 - Si un enlace referencia nodos inexistentes, el saneamiento lo elimina.
 - Validar siempre que el backend y schema GraphQL expongan `Lane.width` y `Lane.height`.
+
+## 9. Extension arquitectonica: Push Notifications
+
+- Nuevo adaptador de infraestructura en backend para Firebase Admin SDK.
+- Nuevo endpoint de aplicacion para registrar token FCM por usuario autenticado.
+- Integracion en orquestacion de tareas: al crear tarea pendiente se dispara notificacion push.
+- Mobile integra Firebase Messaging y manejo de eventos foreground/background/terminated.

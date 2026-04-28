@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'features/auth/data/auth_service.dart';
 import 'features/auth/presentation/login_screen.dart';
@@ -20,12 +21,68 @@ class MobileApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const seed = Color(0xFF0F4C81);
+    final colorScheme = ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.light);
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'BPMN Cliente',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
         useMaterial3: true,
+        colorScheme: colorScheme,
+        scaffoldBackgroundColor: const Color(0xFFF4F7FB),
+        appBarTheme: AppBarTheme(
+          centerTitle: false,
+          elevation: 0,
+          backgroundColor: const Color(0xFFF4F7FB),
+          foregroundColor: colorScheme.onSurface,
+          surfaceTintColor: Colors.transparent,
+          systemOverlayStyle: SystemUiOverlayStyle.dark.copyWith(
+            statusBarColor: const Color(0xFFF4F7FB),
+            statusBarIconBrightness: Brightness.dark,
+            statusBarBrightness: Brightness.light,
+          ),
+          titleTextStyle: TextStyle(
+            color: colorScheme.onSurface,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        cardTheme: CardThemeData(
+          elevation: 2.5,
+          shadowColor: Colors.black.withValues(alpha: 0.12),
+          color: Colors.white,
+          surfaceTintColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.85), width: 1.2),
+          ),
+          margin: EdgeInsets.zero,
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: colorScheme.outlineVariant),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: colorScheme.outlineVariant),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: colorScheme.primary, width: 1.4),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            textStyle: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+        ),
       ),
       home: _AuthGate(
         authService: authService,

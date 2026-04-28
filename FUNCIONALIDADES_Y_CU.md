@@ -250,3 +250,141 @@ Salida: PlantUML (Use Case + Activity + Sequence).
 Contexto del sistema:
 [PEGAR CU-XX]
 ```
+
+## 9. CU adicionales (sin modificar CU-01 a CU-13)
+
+### CU-14 Consultar metricas de politica
+- Objetivo: analizar rendimiento real de tareas por politica.
+- Actores: `Company Admin`.
+- Precondiciones: politica existente con ejecuciones completadas.
+- Flujo principal:
+1. Actor abre vista de metricas de una politica.
+2. Frontend solicita `GET /api/metrics/policy/{policyId}`.
+3. Backend agrega tareas completadas por proceso de esa politica.
+4. Backend calcula promedio de espera, ejecucion y total por tarea.
+5. Frontend muestra ranking y posibles cuellos de botella.
+- Flujos alternos:
+1. Sin datos historicos: respuesta vacia sin error.
+- Postcondiciones: actor obtiene evidencia para optimizar el flujo.
+- Servicios: `MetricsController.getPolicyMetrics`, `MetricsService.getPolicyMetrics`.
+
+### CU-15 Gestionar funcionarios y clientes de empresa
+- Objetivo: administrar usuarios operativos de la empresa.
+- Actores: `Company Admin`.
+- Precondiciones: sesion valida en empresa.
+- Flujo principal:
+1. Actor crea/edita/elimina funcionarios (`/api/admin/functionaries`).
+2. Actor crea/edita/elimina clientes (`/api/admin/clients`).
+3. Sistema valida pertenencia de empresa y persistencia.
+- Flujos alternos:
+1. Rol insuficiente o usuario fuera de empresa: acceso denegado.
+- Postcondiciones: usuarios operativos actualizados.
+- Servicios: `AdminController`, `AdminService`.
+
+### CU-16 Gestionar administradores de empresa
+- Objetivo: administrar cuentas `COMPANY_ADMIN`.
+- Actores: `Software Admin`.
+- Precondiciones: sesion con rol `SOFTWARE_ADMIN`.
+- Flujo principal:
+1. Actor crea company admin (`POST /api/admin/company-admins`).
+2. Actor consulta lista (`GET /api/admin/company-admins`).
+3. Actor actualiza o elimina (`PUT/DELETE /api/admin/company-admins/{userId}`).
+- Flujos alternos:
+1. Usuario duplicado o empresa invalida: error de validacion.
+- Postcondiciones: gobierno administrativo por empresa actualizado.
+- Servicios: `AdminController`, `AdminService`.
+
+### CU-17 Consultar historial de conversacion Copilot
+- Objetivo: recuperar contexto de asistencia IA por politica.
+- Actores: `Company Admin`.
+- Precondiciones: existe conversacion previa o policyId valido.
+- Flujo principal:
+1. Actor solicita historial por `policyId` o `conversationId`.
+2. Frontend invoca `GET /api/copilot/history`.
+3. Backend recupera mensajes persistidos en `copilot_conversations`.
+4. Frontend renderiza historial en el chat.
+- Flujos alternos:
+1. Sin historial: se devuelve conversacion vacia.
+- Postcondiciones: continuidad contextual del asistente.
+- Servicios: `CopilotController.history`, `CopilotService.getConversationHistory`.
+
+### CU-18 Consultar orden de ejecucion de tareas de una politica
+- Objetivo: visualizar secuencia y dependencias del flujo definido.
+- Actores: `Company Admin`.
+- Precondiciones: politica con diagrama valido.
+- Flujo principal:
+1. Actor solicita orden desde el diseÃ±ador.
+2. Frontend invoca query GraphQL `getTaskExecutionOrder(policyId)`.
+3. Backend recorre nodos/enlaces y calcula orden/dependencias.
+4. Sistema devuelve tareas con `laneId` y `laneName`.
+- Flujos alternos:
+1. Diagrama sin nodo START: backend devuelve error de flujo invalido.
+- Postcondiciones: actor entiende secuencia esperada de ejecucion.
+- Servicios: `PolicyGraphQLController.getTaskExecutionOrder`, `PolicyService.getTaskExecutionOrder`.
+
+### CU-19 Sincronizar cambios de diagrama en tiempo real
+- Objetivo: mantener consistencia entre multiples navegadores.
+- Actores: `Company Admin`, `Sistema BPMN`.
+- Precondiciones: clientes conectados a `/ws-designer` y misma politica abierta.
+- Flujo principal:
+1. Usuario A realiza cambio local (move/add/remove/cell-sync/full-sync).
+2. Frontend A publica evento a `/app/policy/{policyId}/change`.
+3. Backend retransmite a `/topic/policy.{policyId}`.
+4. Usuario B aplica evento remoto sobre su grafo local.
+- Flujos alternos:
+1. Divergencia de layout: se fuerza `full-sync`.
+- Postcondiciones: vistas remotas convergen al mismo estado.
+- Servicios: `WebSocketService`, `DesignerSocketController`.
+
+### CU-20 Normalizar diagrama generado por IA para vista de diseÃ±ador
+- Objetivo: unificar estilo/forma entre nodos manuales y nodos creados por IA.
+- Actores: `Company Admin`, `Copilot IA`.
+- Precondiciones: respuesta `apply` con diagrama IA.
+- Flujo principal:
+1. Frontend recibe `diagram` y `lanes` de Copilot.
+2. Ejecuta `normalizeDiagramForDesigner(...)`.
+3. Corrige estilos de nodos/enlaces y posicion respecto a carriles.
+4. Aplica al canvas, guarda y sincroniza.
+- Flujos alternos:
+1. Enlaces huÃ©rfanos o metadata incompleta: saneamiento y advertencias.
+- Postcondiciones: diagrama visible consistente con el estandar manual.
+- Servicios: `DiagramCanvasService.normalizeDiagramForDesigner`, `diagram_tools.sanitize_diagram`.
+
+## 10. Relaciones UML adicionales sugeridas
+- `CU-07 Editar diagrama con Copilot IA` <<include>> `CU-17 Consultar historial de conversacion Copilot`.
+- `CU-07 Editar diagrama con Copilot IA` <<include>> `CU-20 Normalizar diagrama generado por IA`.
+- `CU-06 Editar diagrama BPMN manualmente` <<include>> `CU-19 Sincronizar cambios de diagrama en tiempo real`.
+- `CU-08 Guardar politica y sincronizar colaboracion` <<extend>> `CU-19 Sincronizar cambios de diagrama en tiempo real`.
+- `CU-05 Crear politica BPMN` <<extend>> `CU-18 Consultar orden de ejecucion de tareas`.
+
+### CU-21 Registrar token FCM de dispositivo movil
+- Objetivo: habilitar notificaciones push para el usuario autenticado en mobile.
+- Actores: `Client`.
+- Precondiciones: sesion mobile iniciada y Firebase inicializado.
+- Flujo principal:
+1. App solicita permisos de notificacion.
+2. App obtiene token FCM del dispositivo.
+3. App envia token al backend autenticado.
+4. Backend persiste token en el usuario.
+- Flujos alternos:
+1. Permiso denegado: app sigue operando sin push.
+2. Token invalido o vacio: backend rechaza registro.
+- Postcondiciones: usuario habilitado para recibir push.
+- Servicios: `PushNotificationService.syncTokenWithBackend`, `NotificationTokenController.registerDeviceToken`.
+
+### CU-22 Recibir notificacion push al asignarse nueva tarea
+- Objetivo: notificar al usuario cuando el sistema genera una nueva tarea para su carril/asignacion.
+- Actores: `Client`, `Sistema BPMN`.
+- Precondiciones: usuario con token FCM registrado.
+- Flujo principal:
+1. Motor BPMN crea tarea pendiente.
+2. Backend identifica usuarios objetivo.
+3. Backend envia push por FCM.
+4. Dispositivo recibe notificacion (foreground/background/terminated).
+- Flujos alternos:
+1. Firebase no inicializado: se registra warning y no se interrumpe flujo.
+2. Token desactualizado: push falla para ese usuario y el proceso continua.
+- Postcondiciones: usuario informado en tiempo real de nueva tarea.
+- Servicios: `ProcessExecutionService.createSinglePendingTask`, `FirebaseMessagingService.sendTaskAssignedNotification`.
+
+- `CU-22 Recibir push de nueva tarea` <<include>> `CU-21 Registrar token FCM`.

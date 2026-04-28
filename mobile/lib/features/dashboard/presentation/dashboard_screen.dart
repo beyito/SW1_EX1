@@ -87,7 +87,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => PendingTasksScreen(taskService: widget.taskService),
+          builder: (_) => PendingTasksScreen(
+            taskService: widget.taskService,
+            initialAutoRetry: true,
+          ),
         ),
       );
     } catch (error) {
@@ -220,28 +223,73 @@ class _DashboardScreenState extends State<DashboardScreen> {
               await refreshed;
             },
             child: ListView.builder(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(16),
               itemCount: policies.length,
               itemBuilder: (context, index) {
                 final policy = policies[index];
                 final isStarting = _startingPolicyIds.contains(policy.id);
                 return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 6),
-                  child: ListTile(
-                    title: Text(policy.name),
-                    subtitle: Text(
-                      policy.description.isEmpty
-                          ? 'Sin descripcion'
-                          : policy.description,
+                  margin: const EdgeInsets.symmetric(vertical: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.28),
+                      width: 1.4,
                     ),
-                    trailing: isStarting
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.play_circle_outline),
-                    onTap: isStarting ? null : () => _startPolicy(policy),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.account_tree_outlined,
+                            color: Theme.of(context).colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                policy.name,
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                policy.description.isEmpty ? 'Sin descripcion' : policy.description,
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                              const SizedBox(height: 10),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: FilledButton.icon(
+                                  onPressed: isStarting ? null : () => _startPolicy(policy),
+                                  icon: isStarting
+                                      ? const SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                        )
+                                      : const Icon(Icons.play_arrow_rounded),
+                                  label: Text(isStarting ? 'Iniciando...' : 'Iniciar'),
+                                ),
+                              )
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },

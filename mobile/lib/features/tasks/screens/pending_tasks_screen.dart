@@ -6,10 +6,12 @@ import '../services/task_service.dart';
 
 class PendingTasksScreen extends StatefulWidget {
   final TaskService taskService;
+  final bool initialAutoRetry;
 
   const PendingTasksScreen({
     super.key,
     required this.taskService,
+    this.initialAutoRetry = false,
   });
 
   @override
@@ -22,15 +24,32 @@ class _PendingTasksScreenState extends State<PendingTasksScreen> {
   @override
   void initState() {
     super.initState();
-    _processGroupsFuture = widget.taskService.getMyProcessTaskGroups();
+    _processGroupsFuture = _loadGroupsSafely(withRetry: widget.initialAutoRetry);
+  }
+
+  Future<List<ProcessTaskGroupModel>> _loadGroupsSafely({bool withRetry = false}) async {
+    try {
+      return await widget.taskService.getMyProcessTaskGroups();
+    } catch (_) {
+      if (!withRetry) {
+        rethrow;
+      }
+
+      await Future<void>.delayed(const Duration(milliseconds: 650));
+      return await widget.taskService.getMyProcessTaskGroups();
+    }
   }
 
   Future<void> _refreshTasks() async {
-    final refreshedFuture = widget.taskService.getMyProcessTaskGroups();
+    final refreshedFuture = _loadGroupsSafely();
     setState(() {
       _processGroupsFuture = refreshedFuture;
     });
-    await refreshedFuture;
+    try {
+      await refreshedFuture;
+    } catch (_) {
+      // Evita que aparezca pantalla roja en debug por excepcion no controlada del refresh.
+    }
   }
 
   @override
@@ -45,13 +64,27 @@ class _PendingTasksScreenState extends State<PendingTasksScreen> {
           }
 
           if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  snapshot.error.toString().replaceFirst('Exception: ', ''),
-                  textAlign: TextAlign.center,
-                ),
+            return RefreshIndicator(
+              onRefresh: _refreshTasks,
+              child: ListView(
+                padding: const EdgeInsets.all(24),
+                children: [
+                  const SizedBox(height: 120),
+                  Icon(Icons.error_outline, size: 48, color: Theme.of(context).colorScheme.error),
+                  const SizedBox(height: 12),
+                  Text(
+                    snapshot.error.toString().replaceFirst('Exception: ', ''),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  Center(
+                    child: FilledButton.icon(
+                      onPressed: _refreshTasks,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Reintentar'),
+                    ),
+                  ),
+                ],
               ),
             );
           }
@@ -78,13 +111,23 @@ class _PendingTasksScreenState extends State<PendingTasksScreen> {
                 final group = groups[index];
                 final startedAtLabel = _formatDate(group.startedAt);
                 return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 6),
+                  margin: const EdgeInsets.symmetric(vertical: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.24),
+                      width: 1.3,
+                    ),
+                  ),
                   child: ExpansionTile(
-                    title: Text(group.processTitle),
+                    title: Text(
+                      group.processTitle,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                    ),
                     subtitle: Text(
                       startedAtLabel.isEmpty
                           ? '${group.tasks.length} tareas'
-                          : 'Iniciado: $startedAtLabel · ${group.tasks.length} tareas',
+                          : 'Iniciado: $startedAtLabel - ${group.tasks.length} tareas',
                     ),
                     children: [
                       if (group.processDescription.isNotEmpty)
@@ -103,7 +146,7 @@ class _PendingTasksScreenState extends State<PendingTasksScreen> {
                           leading: _statusIcon(task.status),
                           title: Text(task.taskName),
                           subtitle: Text(
-                            'Estado: ${_statusLabel(task.status)} · Creada: ${_formatDate(task.createdAt)}',
+                            'Estado: ${_statusLabel(task.status)} - Creada: ${_formatDate(task.createdAt)}',
                           ),
                           trailing: const Icon(Icons.chevron_right),
                           onTap: () async {
@@ -166,3 +209,4 @@ class _PendingTasksScreenState extends State<PendingTasksScreen> {
     }
   }
 }
+

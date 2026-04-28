@@ -1,13 +1,15 @@
 import 'package:dio/dio.dart';
 
+import '../../../core/notifications/push_notification_service.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/storage/secure_storage_service.dart';
 
 class AuthService {
   final ApiClient _apiClient;
   final SecureStorageService _storageService;
+  final PushNotificationService _pushNotificationService;
 
-  AuthService(this._apiClient, this._storageService);
+  AuthService(this._apiClient, this._storageService, this._pushNotificationService);
 
   Future<void> login({required String username, required String password}) async {
     try {
@@ -22,6 +24,7 @@ class AuthService {
       }
 
       await _storageService.saveAuthToken(token);
+      await _pushNotificationService.syncTokenWithBackend();
     } on DioException catch (error) {
       throw Exception(_mapDioError(error));
     } catch (_) {
@@ -36,6 +39,7 @@ class AuthService {
 
   Future<void> logout() async {
     await _storageService.clearAuthToken();
+    await _storageService.clearFcmToken();
   }
 
   String _mapDioError(DioException error) {

@@ -171,3 +171,18 @@
 - No incluir celdas de fondo de carril en `diagramJson`.
 - Enlaces deben tener source/target validos; referencias huerfanas son eliminadas por saneamiento.
 - Si una operacion IA es aditiva, fusionar con diagrama base en lugar de reemplazarlo completo.
+
+## 8. Extension FCM Push
+
+### Mobile -> Backend
+- `POST /api/notifications/device-token` (autenticado)
+  - Payload: `{ "token": "<fcm-token>" }`
+  - Efecto: asocia token FCM al usuario actual.
+
+### Backend -> FCM
+- `FirebaseMessagingService.sendTaskAssignedNotification(token, taskName)`
+- Trigger: cuando `ProcessExecutionService` crea una nueva tarea pendiente.
+
+### Consideraciones
+- Si FCM falla, no se bloquea el flujo BPMN.
+- Android 13+ requiere `POST_NOTIFICATIONS`.

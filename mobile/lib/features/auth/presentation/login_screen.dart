@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../data/auth_service.dart';
 import '../../dashboard/data/dashboard_service.dart';
@@ -74,51 +74,92 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Login Cliente')),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextFormField(
-                  controller: _usernameCtrl,
-                  decoration: const InputDecoration(labelText: 'Usuario'),
-                  validator: (value) => (value == null || value.trim().isEmpty)
-                      ? 'Ingresa tu usuario'
-                      : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _passwordCtrl,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Contrasena'),
-                  validator: (value) => (value == null || value.isEmpty)
-                      ? 'Ingresa tu contrasena'
-                      : null,
-                ),
-                const SizedBox(height: 18),
-                FilledButton(
-                  onPressed: _isLoading ? null : _submit,
-                  child: _isLoading
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Iniciar sesion'),
-                ),
-                if (_error != null) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    _error!,
-                    style: const TextStyle(color: Colors.redAccent),
+      body: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [scheme.primary.withValues(alpha: 0.10), Colors.white],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Icon(Icons.shield_outlined, color: scheme.primary, size: 38),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Portal de Tramites',
+                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Inicia sesion para gestionar tus tareas',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 20),
+                          TextFormField(
+                            controller: _usernameCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Usuario',
+                              prefixIcon: Icon(Icons.person_outline),
+                            ),
+                            validator: (value) => (value == null || value.trim().isEmpty)
+                                ? 'Ingresa tu usuario'
+                                : null,
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _passwordCtrl,
+                            obscureText: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Contrasena',
+                              prefixIcon: Icon(Icons.lock_outline),
+                            ),
+                            validator: (value) => (value == null || value.isEmpty)
+                                ? 'Ingresa tu contrasena'
+                                : null,
+                          ),
+                          const SizedBox(height: 18),
+                          FilledButton(
+                            onPressed: _isLoading ? null : _submit,
+                            child: _isLoading
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Text('Iniciar sesion'),
+                          ),
+                          if (_error != null) ...[
+                            const SizedBox(height: 12),
+                            Text(
+                              _error!,
+                              style: TextStyle(color: scheme.error),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                   ),
-                ],
-              ],
+                ),
+              ),
             ),
           ),
         ),

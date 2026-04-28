@@ -44,7 +44,11 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       _taskDetailFuture = nextFuture;
       _message = null;
     });
-    await nextFuture;
+    try {
+      await nextFuture;
+    } catch (_) {
+      // Evita pantalla roja en debug cuando el backend tarda en reflejar cambios.
+    }
   }
 
   Future<void> _pickAndUploadFile(TaskFormFieldModel field) async {
@@ -177,6 +181,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Detalle de tarea')),
       body: FutureBuilder<TaskDetailModel>(
@@ -207,41 +213,89 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                Text(detail.processName, style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 6),
-                Text(detail.taskName, style: Theme.of(context).textTheme.titleMedium),
-                if (detail.description.trim().isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  Text(detail.description),
-                ],
-                const SizedBox(height: 16),
-                if (detail.formFields.isEmpty)
-                  const Text('Esta tarea no tiene formulario, puedes completarla directamente.')
-                else
-                  ...detail.formFields.map((field) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _buildField(field),
-                      )),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          detail.processName,
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          detail.taskName,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                color: scheme.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                        if (detail.description.trim().isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Text(detail.description),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Formulario',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 12),
+                        if (detail.formFields.isEmpty)
+                          const Text('Esta tarea no tiene formulario, puedes completarla directamente.')
+                        else
+                          ...detail.formFields.map((field) => Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: _buildField(field),
+                              )),
+                      ],
+                    ),
+                  ),
+                ),
                 if (_message != null) ...[
                   const SizedBox(height: 8),
-                  Text(
-                    _message!,
-                    style: TextStyle(
-                      color: _message!.toLowerCase().contains('error') ? Colors.red : Colors.blueGrey,
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: _message!.toLowerCase().contains('error')
+                          ? scheme.errorContainer
+                          : scheme.primaryContainer.withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      _message!,
+                      style: TextStyle(
+                        color: _message!.toLowerCase().contains('error')
+                            ? scheme.onErrorContainer
+                            : scheme.onPrimaryContainer,
+                      ),
                     ),
                   ),
                 ],
                 const SizedBox(height: 16),
-                FilledButton.icon(
-                  onPressed: _isSubmitting ? null : () => _submit(detail),
-                  icon: _isSubmitting
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.check_circle_outline),
-                  label: Text(_isSubmitting ? 'Completando...' : 'Completar tarea'),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _isSubmitting ? null : () => _submit(detail),
+                    icon: _isSubmitting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.check_circle_outline),
+                    label: Text(_isSubmitting ? 'Completando...' : 'Completar tarea'),
+                  ),
                 ),
               ],
             ),

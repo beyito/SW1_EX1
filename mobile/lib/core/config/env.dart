@@ -12,4 +12,12 @@ class Env {
         ? dotenv.env['API_BASE_URL']!.trim()
         : 'http://localhost:8080';
   }
+
+  static String get firebaseApiKey {
+    return dotenv.env['FIREBASE_API_KEY']?.trim() ?? '';
+  }
+
+  static String get firebaseProjectId {
+    return dotenv.env['FIREBASE_PROJECT_ID']?.trim() ?? '';
+  }
 }

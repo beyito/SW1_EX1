@@ -1,4 +1,6 @@
 # Miscellaneous
+.env.example
+.env
 *.class
 *.log
 *.pyc
@@ -43,5 +45,4 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
-
-.env
+/android/app/google-services.json

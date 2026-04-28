@@ -336,3 +336,13 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8010
 - `ARCHITECTURE.md`
 - `FUNCIONALIDADES_Y_CU.md`
 - `COMUNICACION_SERVICIOS.md`
+
+## 12) Novedad reciente: Push Notifications FCM
+
+- Backend ahora soporta Firebase Admin SDK para envio push.
+- Nuevo endpoint autenticado: `POST /api/notifications/device-token` para registrar token FCM del dispositivo.
+- `User` ahora persiste `fcmToken` y `fcmTokenUpdatedAt`.
+- `ProcessExecutionService` dispara push cuando crea una nueva tarea pendiente (`createSinglePendingTask`).
+- Mobile integra `firebase_core`, `firebase_messaging`, `flutter_local_notifications`.
+- Mobile maneja notificaciones en `foreground`, `background` y apertura desde app terminada.
+- Android 13+: se solicita permiso `POST_NOTIFICATIONS`.
