@@ -127,7 +127,7 @@
             </div>
 
             <div class="new-field-form" *ngIf="isFormDesignerOpen">
-              <h5>Agregar pregunta</h5>
+              <h5>{{ editingFieldIndex !== null ? 'Editar pregunta' : 'Agregar pregunta' }}</h5>
               <label>Tipo de pregunta</label>
               <select [(ngModel)]="newFieldType">
                 <option value="text">Texto corto</option>
@@ -149,6 +149,11 @@
 
               <div class="field-options">
                 <label class="checkbox-label">
+                  <input type="checkbox" [(ngModel)]="newFieldRequired" />
+                  Campo obligatorio
+                </label>
+
+                <label class="checkbox-label">
                   <input type="checkbox" [(ngModel)]="newFieldRequiresAttachment" />
                   Requiere adjunto
                 </label>
@@ -159,7 +164,14 @@
                 </div>
               </div>
 
-              <button type="button" class="add-field-btn action-positive" (click)="addTaskField()">Agregar pregunta</button>
+              <div class="button-row">
+                <button type="button" class="add-field-btn action-positive" (click)="addTaskField()">
+                  {{ editingFieldIndex !== null ? 'Guardar cambios' : 'Agregar pregunta' }}
+                </button>
+                <button *ngIf="editingFieldIndex !== null" type="button" class="action-outline" (click)="cancelEditField()">
+                  Cancelar edición
+                </button>
+              </div>
             </div>
           </div>
         </div>

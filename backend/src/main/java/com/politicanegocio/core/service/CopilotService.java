@@ -151,14 +151,10 @@ public class CopilotService {
                     exception
             );
 
-            throw new ResponseStatusException(
-                    timedOut ? HttpStatus.GATEWAY_TIMEOUT : HttpStatus.BAD_GATEWAY,
-                    (timedOut ? "Timeout esperando respuesta del microservicio IA. " : "No se pudo conectar con el microservicio IA. ")
-                            + "requestId=" + requestId
-                            + " aiBaseUrl=" + aiEngineBaseUrl
-                            + " rootCause=" + rootCause,
-                    exception
-            );
+            if (timedOut) {
+                throw timeoutAiException("chat", requestId, exception);
+            }
+            throw unavailableAiException("chat", requestId, exception);
         } catch (RestClientResponseException exception) {
             String body = exception.getResponseBodyAsString();
             String trimmedBody = body == null ? "" : body.trim();
@@ -174,13 +170,7 @@ public class CopilotService {
                     exception
             );
 
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_GATEWAY,
-                    "Error del microservicio IA. requestId=" + requestId
-                            + " status=" + exception.getStatusCode().value()
-                            + " body=" + trimmedBody,
-                    exception
-            );
+            throw badGatewayAiException("chat", requestId, exception);
         } catch (ResponseStatusException exception) {
             throw exception;
         } catch (Exception exception) {
@@ -191,12 +181,7 @@ public class CopilotService {
                     exception
             );
 
-            throw new ResponseStatusException(
-                    HttpStatus.INTERNAL_SERVER_ERROR,
-                    "Fallo interno en gateway de copilot. requestId=" + requestId
-                            + " message=" + exception.getMessage(),
-                    exception
-            );
+            throw unavailableAiException("chat", requestId, exception);
         }
     }
 
@@ -268,34 +253,21 @@ public class CopilotService {
                     ? exception.getMostSpecificCause().toString()
                     : exception.toString();
             boolean timedOut = rootCause.toLowerCase().contains("timed out");
-            throw new ResponseStatusException(
-                    timedOut ? HttpStatus.GATEWAY_TIMEOUT : HttpStatus.BAD_GATEWAY,
-                    (timedOut ? "Timeout esperando respuesta del microservicio IA (voice-fill). " : "No se pudo conectar con el microservicio IA (voice-fill). ")
-                            + "requestId=" + requestId
-                            + " rootCause=" + rootCause,
-                    exception
-            );
+            if (timedOut) {
+                throw timeoutAiException("voice-fill", requestId, exception);
+            }
+            throw unavailableAiException("voice-fill", requestId, exception);
         } catch (RestClientResponseException exception) {
             String body = exception.getResponseBodyAsString();
             String trimmedBody = body == null ? "" : body.trim();
             if (trimmedBody.length() > 1000) {
                 trimmedBody = trimmedBody.substring(0, 1000) + "...";
             }
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_GATEWAY,
-                    "Error del microservicio IA (voice-fill). requestId=" + requestId
-                            + " status=" + exception.getStatusCode().value()
-                            + " body=" + trimmedBody,
-                    exception
-            );
+            throw badGatewayAiException("voice-fill", requestId, exception);
         } catch (ResponseStatusException exception) {
             throw exception;
         } catch (Exception exception) {
-            throw new ResponseStatusException(
-                    HttpStatus.INTERNAL_SERVER_ERROR,
-                    "Fallo interno en voice-fill. requestId=" + requestId + " message=" + exception.getMessage(),
-                    exception
-            );
+            throw unavailableAiException("voice-fill", requestId, exception);
         }
     }
 
@@ -347,26 +319,17 @@ public class CopilotService {
                     ? exception.getMostSpecificCause().toString()
                     : exception.toString();
             boolean timedOut = rootCause.toLowerCase().contains("timed out");
-            throw new ResponseStatusException(
-                    timedOut ? HttpStatus.GATEWAY_TIMEOUT : HttpStatus.BAD_GATEWAY,
-                    (timedOut ? "Timeout esperando respuesta del microservicio IA (apply). " : "No se pudo conectar con el microservicio IA (apply). ")
-                            + "requestId=" + requestId
-                            + " rootCause=" + rootCause,
-                    exception
-            );
+            if (timedOut) {
+                throw timeoutAiException("apply", requestId, exception);
+            }
+            throw unavailableAiException("apply", requestId, exception);
         } catch (RestClientResponseException exception) {
             String body = exception.getResponseBodyAsString();
             String trimmedBody = body == null ? "" : body.trim();
             if (trimmedBody.length() > 1000) {
                 trimmedBody = trimmedBody.substring(0, 1000) + "...";
             }
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_GATEWAY,
-                    "Error del microservicio IA (apply). requestId=" + requestId
-                            + " status=" + exception.getStatusCode().value()
-                            + " body=" + trimmedBody,
-                    exception
-            );
+            throw badGatewayAiException("apply", requestId, exception);
         }
     }
 
@@ -519,5 +482,23 @@ public class CopilotService {
                     exception
             );
         }
+    }
+
+    private ResponseStatusException unavailableAiException(String operation, String requestId, Exception cause) {
+        String message = "El servicio de IA no se encuentra disponible en este momento. Intente nuevamente en unos minutos. "
+                + "(operacion=" + operation + ", requestId=" + requestId + ")";
+        return new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, message, cause);
+    }
+
+    private ResponseStatusException timeoutAiException(String operation, String requestId, Exception cause) {
+        String message = "El servicio de IA esta saturado o demoro demasiado en responder. Intente nuevamente. "
+                + "(operacion=" + operation + ", requestId=" + requestId + ")";
+        return new ResponseStatusException(HttpStatus.GATEWAY_TIMEOUT, message, cause);
+    }
+
+    private ResponseStatusException badGatewayAiException(String operation, String requestId, Exception cause) {
+        String message = "El servicio de IA devolvio una respuesta no valida. Intente nuevamente. "
+                + "(operacion=" + operation + ", requestId=" + requestId + ")";
+        return new ResponseStatusException(HttpStatus.BAD_GATEWAY, message, cause);
     }
 }

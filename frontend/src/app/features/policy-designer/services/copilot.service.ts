@@ -74,7 +74,7 @@ public async sendMessage(
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`Copilot HTTP ${response.status}: ${error || 'No se pudo obtener respuesta del copilot.'}`);
+      throw new Error(this.mapAiError(response.status, error, 'No se pudo obtener respuesta del copilot.'));
     }
 
     return response.json();
@@ -93,7 +93,7 @@ public async sendMessage(
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`Copilot History HTTP ${response.status}: ${error || 'No se pudo cargar el historial.'}`);
+      throw new Error(this.mapAiError(response.status, error, 'No se pudo cargar el historial.'));
     }
 
     const payload = await response.json() as CopilotConversation;
@@ -119,7 +119,7 @@ public async sendMessage(
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`Copilot Apply HTTP ${response.status}: ${error || 'No se pudo aplicar el cambio.'}`);
+      throw new Error(this.mapAiError(response.status, error, 'No se pudo aplicar el cambio.'));
     }
     return response.json();
   }
@@ -131,5 +131,22 @@ public async sendMessage(
       headers['Authorization'] = `Bearer ${token}`;
     }
     return headers;
+  }
+
+  private mapAiError(status: number, raw: string, fallback: string): string {
+    if (status === 503) {
+      return 'El servicio de IA no está disponible en este momento. Intenta nuevamente en unos minutos.';
+    }
+    if (status === 504) {
+      return 'El servicio de IA está saturado o demoró demasiado en responder. Intenta nuevamente.';
+    }
+    if (status === 502) {
+      return 'El servicio de IA devolvió una respuesta inválida. Intenta nuevamente.';
+    }
+    if (status >= 500) {
+      return 'Ocurrió un error temporal en el servicio de IA. Intenta nuevamente.';
+    }
+    const text = (raw ?? '').trim();
+    return text || fallback;
   }
 }

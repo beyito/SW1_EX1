@@ -65,7 +65,7 @@
             <div class="form-field">
               <label [for]="fieldName(field, $index)">
                 {{ field.label }}
-                @if (field.required) {
+                @if (field.required || field.requiresAttachment) {
                   <span class="required">*</span>
                 }
               </label>

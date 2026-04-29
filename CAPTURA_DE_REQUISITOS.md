@@ -435,3 +435,39 @@
 - Firebase no inicializado o credenciales invalidas.
 - Token expirado/no registrado.
 - Falla de entrega en FCM (sin bloquear la ejecucion del flujo BPMN).
+
+## 4. CU agregados por Autocompletado de Formulario con IA
+
+| ID | Nombre del Caso de Uso | Estado | Prioridad | Riesgo | Actores involucrados | Ciclo |
+|---|---|---|---|---|---|---|
+| CU23 | Rellenar formulario de tarea con IA (voz/texto) | Incorporado | Significativo | Critico | Functionary, Client, Sistema BPMN, Copilot IA | C4 |
+
+### CU23
+**ID**: CU23  
+**Nombre de caso de uso**: Rellenar formulario de tarea con IA (voz/texto)  
+**Proposito**: Asistir al usuario en el prellenado de campos de un formulario dinamico de tarea a partir de transcripcion de voz o texto, manteniendo el envio final bajo confirmacion manual.  
+**Actores**: Functionary, Client, Sistema BPMN, Copilot IA  
+**Actor iniciador**: Functionary / Client  
+**Pre condicion**:
+1. Tarea en estado `IN_PROGRESS`.
+2. Formulario de tarea disponible en el detalle.
+3. Servicio IA de autocompletado disponible.
+**Flujo Principal**:
+1. El actor inicia captura de voz (o ingresa texto) en el formulario de ejecucion.
+2. El sistema obtiene transcripcion y la muestra para revision.
+3. El actor solicita explicitamente "Enviar a la IA".
+4. El frontend envia transcripcion + lista de campos del formulario al backend.
+5. El backend delega al motor IA la extraccion estructurada de valores.
+6. El motor IA devuelve un JSON clave-valor restringido a campos del formulario.
+7. El frontend aplica `patchValue` y rellena visualmente los controles.
+8. El actor revisa respuestas y decide completar manualmente la tarea.
+**Post condicion**: Formulario prellenado con sugerencias IA sin completar automaticamente la tarea.  
+**Excepcion**:
+- Error de reconocimiento de voz.
+- Servicio IA no disponible o saturado.
+- Respuesta IA invalida o sin campos utilizables.
+- El actor cancela o no envia la transcripcion a IA.
+
+### Ubicacion por paquete funcional
+- **Paquete 3: Ejecucion Operativa de Procesos**  
+Justificacion: el caso de uso ocurre durante la ejecucion de tareas y afecta exclusivamente la captura de `formData` previa al completado.

@@ -70,6 +70,8 @@ export interface TaskFormField {
   type: 'text' | 'number' | 'select' | 'checkbox' | 'boolean' | 'date' | 'textarea' | 'file';
   label: string;
   required?: boolean;
+  requiresAttachment?: boolean;
+  attachmentLabel?: string;
   options?: string[];
   placeholder?: string;
 }

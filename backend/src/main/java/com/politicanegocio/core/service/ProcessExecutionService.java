@@ -143,6 +143,8 @@ public class ProcessExecutionService {
 
                 for (JsonNode field : schemaNode) {
                     boolean isRequired = field.has("required") && field.get("required").asBoolean();
+                    boolean requiresAttachment = field.has("requiresAttachment") && field.get("requiresAttachment").asBoolean();
+                    String fieldType = field.has("type") ? field.get("type").asText("") : "";
                     
                     String fieldKey = null;
                     if (field.has("name") && !field.get("name").asText().isEmpty()) {
@@ -151,8 +153,9 @@ public class ProcessExecutionService {
                         fieldKey = field.get("id").asText();
                     }
 
-                    if (isRequired && fieldKey != null) {
-                        if (dataNode.isEmpty() || !dataNode.has(fieldKey) || dataNode.get(fieldKey).asText().trim().isEmpty()) {
+                    if ((isRequired || requiresAttachment) && fieldKey != null) {
+                        JsonNode valueNode = dataNode.isEmpty() ? null : dataNode.get(fieldKey);
+                        if (isMissingRequiredValue(valueNode, fieldType, requiresAttachment)) {
                             String fieldLabel = field.has("label") ? field.get("label").asText() : fieldKey;
                             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Validacion fallida: El campo '" + fieldLabel + "' es obligatorio.");
                         }
@@ -865,5 +868,32 @@ public class ProcessExecutionService {
         if (!isAssignedToUser && !userLane.equals(taskLane)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes permisos para acceder a esta tarea");
         }
+    }
+
+    private boolean isMissingRequiredValue(JsonNode valueNode, String fieldType, boolean requiresAttachment) {
+        if (valueNode == null || valueNode.isNull()) {
+            return true;
+        }
+
+        if ("checkbox".equalsIgnoreCase(fieldType) || "boolean".equalsIgnoreCase(fieldType)) {
+            return !valueNode.asBoolean(false);
+        }
+
+        if ("file".equalsIgnoreCase(fieldType) || requiresAttachment) {
+            if (valueNode.isTextual()) {
+                return valueNode.asText("").trim().isEmpty();
+            }
+            return valueNode.isMissingNode() || valueNode.isNull();
+        }
+
+        if (valueNode.isTextual()) {
+            return valueNode.asText("").trim().isEmpty();
+        }
+
+        if (valueNode.isArray()) {
+            return valueNode.isEmpty();
+        }
+
+        return false;
     }
 }

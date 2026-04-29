@@ -91,8 +91,10 @@ export class PolicyDesignerComponent implements OnInit, AfterViewInit, OnDestroy
   public newFieldLabel = '';
   public newFieldType: FormField['type'] = 'text';
   public newFieldOptions = '';
+  public newFieldRequired = false;
   public newFieldRequiresAttachment = false;
   public newFieldAttachmentLabel = '';
+  public editingFieldIndex: number | null = null;
   public isFormDesignerOpen = false;
   public newElementName = '';
   public isRenaming = false;
@@ -921,18 +923,30 @@ private showLinkTools(linkView: dia.LinkView): void {
       ? this.newFieldOptions.split(',').map(opt => opt.trim()).filter(opt => opt)
       : undefined;
 
+    const normalizedAttachmentLabel = this.newFieldRequiresAttachment
+      ? (this.newFieldAttachmentLabel?.trim() || 'Adjunto requerido')
+      : undefined;
+
     const newField: FormField = {
-      id: `field-${Date.now()}`,
+      id: this.editingFieldIndex !== null
+        ? this.selectedTaskFormFields[this.editingFieldIndex]?.id ?? `field-${Date.now()}`
+        : `field-${Date.now()}`,
       type: this.newFieldType,
       label,
       placeholder: '',
-      required: false,
+      required: this.newFieldRequired,
       options,
       requiresAttachment: this.newFieldRequiresAttachment,
-      attachmentLabel: this.newFieldRequiresAttachment ? this.newFieldAttachmentLabel : undefined
+      attachmentLabel: normalizedAttachmentLabel
     };
 
-    this.selectedTaskFormFields.push(newField);
+    if (this.editingFieldIndex !== null) {
+      this.selectedTaskFormFields[this.editingFieldIndex] = { ...newField };
+      this.infoMessage = `Pregunta "${label}" actualizada.`;
+    } else {
+      this.selectedTaskFormFields.push(newField);
+      this.infoMessage = `Pregunta "${label}" agregada.`;
+    }
     this.resetNewFieldForm();
     this.applySelectedNodeMetadata();
   }
@@ -951,8 +965,10 @@ private showLinkTools(linkView: dia.LinkView): void {
     this.newFieldLabel = '';
     this.newFieldType = 'text';
     this.newFieldOptions = '';
+    this.newFieldRequired = false;
     this.newFieldRequiresAttachment = false;
     this.newFieldAttachmentLabel = '';
+    this.editingFieldIndex = null;
   }
 
   public toggleFormDesigner(): void {
@@ -995,8 +1011,24 @@ private showLinkTools(linkView: dia.LinkView): void {
   }
 
   public editField(index: number): void {
-    // Por ahora solo mostramos un mensaje, pero podríamos implementar edición inline
-    this.infoMessage = `Para editar "${this.selectedTaskFormFields[index].label}", elimina y vuelve a crear el campo.`;
+    const field = this.selectedTaskFormFields[index];
+    if (!field) {
+      return;
+    }
+    this.editingFieldIndex = index;
+    this.newFieldLabel = field.label ?? '';
+    this.newFieldType = field.type ?? 'text';
+    this.newFieldRequired = !!field.required;
+    this.newFieldRequiresAttachment = !!field.requiresAttachment;
+    this.newFieldAttachmentLabel = field.attachmentLabel ?? '';
+    this.newFieldOptions = Array.isArray(field.options) ? field.options.join(', ') : '';
+    this.isFormDesignerOpen = true;
+    this.infoMessage = `Editando pregunta "${field.label}".`;
+  }
+
+  public cancelEditField(): void {
+    this.resetNewFieldForm();
+    this.infoMessage = 'Edición de pregunta cancelada.';
   }
 
   public onSelectedLinkConditionChange(update: LinkConditionUpdate): void {

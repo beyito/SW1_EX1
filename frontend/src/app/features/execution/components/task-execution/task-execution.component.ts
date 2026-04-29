@@ -253,8 +253,8 @@ export class TaskExecutionComponent implements OnInit {
 
     fields.forEach((field, index) => {
       const controlName = this.fieldName(field, index);
-      // Aquí usas la propiedad 'required' real que viene del JSON, o false por defecto
-      const isRequired = field.required ?? false; 
+      // required clásico o requerimiento explícito de adjunto
+      const isRequired = (field.required ?? false) || (field.requiresAttachment ?? false);
       const isBooleanField = field.type === 'checkbox' || field.type === 'boolean';
 
       controls[controlName] = this.fb.control(

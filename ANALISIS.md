@@ -13,7 +13,7 @@ Se encarga de crear/editar politicas BPMN, guardado del diagrama, colaboracion e
 ## Paquete 3: Ejecucion Operativa de Procesos
 Se encarga de iniciar procesos, gestionar tareas (tomar, iniciar, completar) y enrutar el flujo segun reglas BPMN.
 
-**CU que participan**: `CU09`, `CU10`, `CU11`, `CU13`.
+**CU que participan**: `CU09`, `CU10`, `CU11`, `CU13`, `CU23`.
 
 ## Paquete 4: Servicios de Soporte
 Se encarga de adjuntos, metricas de politicas y notificaciones push (registro de token y aviso de nueva tarea).

@@ -135,7 +135,7 @@ export class ExecutionService {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(error || 'No se pudo autocompletar por voz.');
+      throw new Error(this.mapAiError(response.status, error, 'No se pudo autocompletar por voz.'));
     }
     return response.json();
   }
@@ -149,8 +149,6 @@ export class ExecutionService {
     return headers;
   }
 
-  // ... tus otros m√©todos ...
-
   public async uploadFile(file: File, policyId?: string): Promise<any> {
     const formData = new FormData();
     formData.append('file', file);
@@ -158,8 +156,6 @@ export class ExecutionService {
       formData.append('policyId', policyId);
     }
 
-    // Copiamos los headers de autenticaci√≥n pero ELIMINAMOS el Content-Type
-    // para que el navegador ponga autom√°ticamente 'multipart/form-data'
     const headers: Record<string, string> = { ...this.authHeaders };
     delete headers['Content-Type'];
 
@@ -174,7 +170,23 @@ export class ExecutionService {
       throw new Error(error || 'No se pudo subir el archivo a S3');
     }
 
-    return response.json(); // Esto devolver√° tu UploadResponseDto (con la URL)
+    return response.json();
   }
-  
+
+  private mapAiError(status: number, raw: string, fallback: string): string {
+    if (status === 503) {
+      return 'El servicio de IA no est· disponible en este momento. Intenta nuevamente en unos minutos.';
+    }
+    if (status === 504) {
+      return 'El servicio de IA est· saturado o demorÛ demasiado en responder. Intenta nuevamente.';
+    }
+    if (status === 502) {
+      return 'El servicio de IA devolviÛ una respuesta inv·lida. Intenta nuevamente.';
+    }
+    if (status >= 500) {
+      return 'OcurriÛ un error temporal en el servicio de IA. Intenta nuevamente.';
+    }
+    const text = (raw ?? '').trim();
+    return text || fallback;
+  }
 }
