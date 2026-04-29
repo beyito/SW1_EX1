@@ -6,9 +6,9 @@ Se encarga de autenticacion, sesion, autorizacion por roles y administracion de 
 **CU que participan**: `CU01`, `CU02`, `CU03`, `CU04`, `CU15`, `CU16`.
 
 ## Paquete 2: Diseno Colaborativo de Politicas BPMN
-Se encarga de crear/editar politicas BPMN, colaboracion en tiempo real, integracion con Copilot IA y normalizacion del diagrama.
+Se encarga de crear/editar politicas BPMN, guardado del diagrama, colaboracion en tiempo real y consulta de orden de ejecucion.
 
-**CU que participan**: `CU05`, `CU06`, `CU07`, `CU08`, `CU17`, `CU18`, `CU19`, `CU20`.
+**CU que participan**: `CU05`, `CU06`, `CU08`, `CU18`, `CU19`.
 
 ## Paquete 3: Ejecucion Operativa de Procesos
 Se encarga de iniciar procesos, gestionar tareas (tomar, iniciar, completar) y enrutar el flujo segun reglas BPMN.
@@ -19,6 +19,11 @@ Se encarga de iniciar procesos, gestionar tareas (tomar, iniciar, completar) y e
 Se encarga de adjuntos, metricas de politicas y notificaciones push (registro de token y aviso de nueva tarea).
 
 **CU que participan**: `CU12`, `CU14`, `CU21`, `CU22`.
+
+## Paquete 5: Integracion Inteligente Copilot IA
+Se encarga de la asistencia conversacional, aplicacion automatica de cambios sobre el diagrama y normalizacion del resultado IA para mantener consistencia estructural y visual.
+
+**CU que participan**: `CU07`, `CU17`, `CU20`.
 
 ## Diagramas de Colaboracion (Guia)
 Objetivo: para cada CU representar como colaboran actor, frontend (web o mobile), backend (GraphQL/REST), motor BPMN/IA y base de datos.

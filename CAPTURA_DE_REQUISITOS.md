@@ -149,7 +149,6 @@
 3. Copilot IA analiza y propone cambios.
 4. El sistema recibe diagrama modificado y advertencias.
 5. El frontend normaliza formato/posiciones.
-6. El actor revisa y confirma uso de cambios.
 **Post condici�n**: Diagrama actualizado con cambios asistidos por IA.  
 **Excepci�n**:
 - Timeout o fallo del servicio IA.
