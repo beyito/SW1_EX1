@@ -37,6 +37,29 @@
       }
 
       @if (taskDetail.status === 'IN_PROGRESS' && formReady) {
+        <div class="actions" style="margin-bottom: 12px;">
+          <button class="btn btn-secondary" type="button" (click)="startVoiceAutofill()" [disabled]="isRecording || isAiProcessing || completingTask">
+            {{ isRecording ? 'Escuchando...' : 'Autocompletar por voz' }}
+          </button>
+          <button class="btn" type="button" (click)="stopVoiceAutofill()" [disabled]="!isRecording">Detener</button>
+          <button class="btn btn-primary" type="button" (click)="sendTranscriptToAi()" [disabled]="isRecording || isAiProcessing || !pendingTranscript">
+            {{ isAiProcessing ? 'Procesando IA...' : 'Enviar a la IA' }}
+          </button>
+        </div>
+        @if (isAiProcessing) {
+          <p class="message">Procesando transcripción con IA...</p>
+        }
+        <div class="form-field">
+          <label for="pendingTranscript">Transcripción de voz (editable antes de IA)</label>
+          <textarea
+            id="pendingTranscript"
+            [disabled]="isAiProcessing"
+            rows="3"
+            [value]="pendingTranscript"
+            (input)="pendingTranscript = $any($event.target).value"
+            placeholder="Aquí aparecerá la transcripción para revisión..."></textarea>
+        </div>
+
         <form [formGroup]="formGroup" class="dynamic-form" (ngSubmit)="submitTask()">
           @for (field of formSchemaFields; track fieldName(field, $index)) {
             <div class="form-field">

@@ -4,6 +4,7 @@ import { FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators } 
 import { ActivatedRoute, Router } from '@angular/router';
 import { ExecutionService } from '../../services/execution.service';
 import { TaskDetailDto, TaskFormField, TaskStatus } from '../../models/execution.models';
+import { VoiceRecognitionService } from '../../services/voice-recognition.service';
 
 type DynamicFormGroup = FormGroup<Record<string, FormControl>>;
 
@@ -19,6 +20,7 @@ export class TaskExecutionComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
   private readonly executionService = inject(ExecutionService);
+  private readonly voiceRecognitionService = inject(VoiceRecognitionService);
   private readonly cdr = inject(ChangeDetectorRef);
 
   public loading = false;
@@ -31,6 +33,10 @@ export class TaskExecutionComponent implements OnInit {
   public formReady = false;
   public savedAnswers: Record<string, unknown> = {};
   public decisionOptions: string[] = [];
+  public isRecording = false;
+  public isAiProcessing = false;
+  public lastTranscript = '';
+  public pendingTranscript = '';
 
   // 🚩 AGREGADO PARA S3: Control de estado de subida por cada campo
   public uploadingFiles: Record<string, boolean> = {};
@@ -145,6 +151,75 @@ export class TaskExecutionComponent implements OnInit {
       this.message = error instanceof Error ? error.message : 'Error al finalizar la tarea';
     } finally {
       this.completingTask = false;
+      this.cdr.detectChanges();
+    }
+  }
+
+  public async startVoiceAutofill(): Promise<void> {
+    if (!this.voiceRecognitionService.isSupported()) {
+      this.message = 'Tu navegador no soporta reconocimiento de voz.';
+      this.cdr.detectChanges();
+      return;
+    }
+    if (!this.formReady || !this.taskDetail || this.taskDetail.status !== 'IN_PROGRESS') {
+      return;
+    }
+
+    this.isRecording = true;
+    this.message = '';
+    this.cdr.detectChanges();
+
+    this.voiceRecognitionService.createSession('es-ES').subscribe({
+      next: (transcript: string) => {
+        this.lastTranscript = transcript;
+        this.pendingTranscript = transcript;
+        this.isRecording = false;
+        this.message = transcript
+          ? 'Transcripción capturada. Revisa el texto y presiona "Enviar a la IA".'
+          : 'No se capturó texto. Intenta nuevamente.';
+        this.cdr.detectChanges();
+      },
+      error: (error: Error) => {
+        this.isRecording = false;
+        this.isAiProcessing = false;
+        this.message = `Error de reconocimiento de voz: ${error?.message || 'desconocido'}`;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  public stopVoiceAutofill(): void {
+    this.voiceRecognitionService.stop();
+    this.isRecording = false;
+    this.cdr.detectChanges();
+  }
+
+  public async sendTranscriptToAi(): Promise<void> {
+    const transcript = (this.pendingTranscript ?? '').trim();
+    if (!transcript) {
+      this.message = 'No hay transcripción para enviar a la IA.';
+      this.cdr.detectChanges();
+      return;
+    }
+    if (!this.formReady || !this.taskDetail || this.taskDetail.status !== 'IN_PROGRESS') {
+      return;
+    }
+
+    this.isAiProcessing = true;
+    this.message = '';
+    this.formGroup.disable({ emitEvent: false });
+    this.cdr.detectChanges();
+
+    try {
+      const formFields = this.formSchemaFields.map((field, index) => this.fieldName(field, index));
+      const patch = await this.executionService.voiceFill(transcript, formFields);
+      this.formGroup.patchValue(patch, { emitEvent: false });
+      this.message = 'Formulario autocompletado por IA. Revisa y guarda manualmente.';
+    } catch (error) {
+      this.message = error instanceof Error ? error.message : 'No se pudo autocompletar por voz.';
+    } finally {
+      this.isAiProcessing = false;
+      this.formGroup.enable({ emitEvent: false });
       this.cdr.detectChanges();
     }
   }

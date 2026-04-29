@@ -126,6 +126,20 @@ export class ExecutionService {
     return response.json();
   }
 
+  public async voiceFill(voiceTranscript: string, formFields: string[]): Promise<Record<string, unknown>> {
+    const response = await fetch('/api/copilot/voice-fill', {
+      method: 'POST',
+      headers: this.authHeaders,
+      body: JSON.stringify({ voiceTranscript, formFields })
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(error || 'No se pudo autocompletar por voz.');
+    }
+    return response.json();
+  }
+
   private get authHeaders(): Record<string, string> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     const token = this.authService.getToken();

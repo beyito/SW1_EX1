@@ -7,6 +7,7 @@ import com.politicanegocio.core.dto.CopilotConversationDto;
 import com.politicanegocio.core.dto.CopilotHistoryMessageDto;
 import com.politicanegocio.core.dto.CopilotRequestDto;
 import com.politicanegocio.core.dto.CopilotResponseDto;
+import com.politicanegocio.core.dto.VoiceFillRequestDto;
 import com.politicanegocio.core.model.CopilotConversation;
 import com.politicanegocio.core.model.User;
 import com.politicanegocio.core.repository.CopilotConversationRepository;
@@ -27,6 +28,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.UUID;
 
 @Service
@@ -222,6 +225,78 @@ public class CopilotService {
         }
 
         return toConversationDto(conversation);
+    }
+
+    public Map<String, Object> fillFormFromVoice(VoiceFillRequestDto request) {
+        if (request == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request vacio para voice-fill.");
+        }
+        String transcript = request.voiceTranscript() == null ? "" : request.voiceTranscript().trim();
+        if (transcript.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "voiceTranscript es obligatorio.");
+        }
+        if (request.formFields() == null || request.formFields().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "formFields es obligatorio.");
+        }
+
+        String requestId = UUID.randomUUID().toString();
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("voice_transcript", transcript);
+        payload.put("form_fields", request.formFields());
+
+        try {
+            String aiRawResponse = restClient.post()
+                    .uri("/api/v1/agent/voice-fill")
+                    .header("X-Request-Id", requestId)
+                    .body(payload)
+                    .retrieve()
+                    .body(String.class);
+
+            if (aiRawResponse == null || aiRawResponse.trim().isEmpty()) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY,
+                        "El microservicio IA devolvio respuesta vacia (voice-fill). requestId=" + requestId
+                );
+            }
+
+            Map<String, Object> parsed = objectMapper.readValue(aiRawResponse, Map.class);
+            Set<String> allowed = new HashSet<>(request.formFields());
+            parsed.keySet().removeIf(key -> !allowed.contains(key));
+            return parsed;
+        } catch (ResourceAccessException exception) {
+            String rootCause = exception.getMostSpecificCause() != null
+                    ? exception.getMostSpecificCause().toString()
+                    : exception.toString();
+            boolean timedOut = rootCause.toLowerCase().contains("timed out");
+            throw new ResponseStatusException(
+                    timedOut ? HttpStatus.GATEWAY_TIMEOUT : HttpStatus.BAD_GATEWAY,
+                    (timedOut ? "Timeout esperando respuesta del microservicio IA (voice-fill). " : "No se pudo conectar con el microservicio IA (voice-fill). ")
+                            + "requestId=" + requestId
+                            + " rootCause=" + rootCause,
+                    exception
+            );
+        } catch (RestClientResponseException exception) {
+            String body = exception.getResponseBodyAsString();
+            String trimmedBody = body == null ? "" : body.trim();
+            if (trimmedBody.length() > 1000) {
+                trimmedBody = trimmedBody.substring(0, 1000) + "...";
+            }
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_GATEWAY,
+                    "Error del microservicio IA (voice-fill). requestId=" + requestId
+                            + " status=" + exception.getStatusCode().value()
+                            + " body=" + trimmedBody,
+                    exception
+            );
+        } catch (ResponseStatusException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Fallo interno en voice-fill. requestId=" + requestId + " message=" + exception.getMessage(),
+                    exception
+            );
+        }
     }
 
    public CopilotApplyResponseDto apply(CopilotApplyRequestDto request) {

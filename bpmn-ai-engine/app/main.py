@@ -52,6 +52,10 @@ class CopilotResponse(BaseModel):
     message: str
     suggested_actions: List[str] = Field(default_factory=list)
 
+class VoiceFillRequest(BaseModel):
+    voice_transcript: str = Field(..., min_length=1)
+    form_fields: List[str] = Field(default_factory=list)
+
 
 @app.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
@@ -77,6 +81,76 @@ def _resolve_model_candidates(requested_models: List[str]) -> List[str]:
         seen.add(model)
         deduped.append(model)
     return deduped or [settings.ai_model]
+
+
+@app.post("/api/v1/agent/voice-fill")
+def voice_fill(payload: VoiceFillRequest, http_request: Request) -> Dict[str, Any]:
+    request_id = http_request.headers.get("X-Request-Id", "").strip() or "n/a"
+    transcript = (payload.voice_transcript or "").strip()
+    fields = [f.strip() for f in (payload.form_fields or []) if isinstance(f, str) and f.strip()]
+    if not transcript:
+        raise HTTPException(status_code=400, detail="voice_transcript es obligatorio")
+    if not fields:
+        raise HTTPException(status_code=400, detail="form_fields es obligatorio")
+
+    if openai_client is None:
+        logger.warning("voice_fill fallback: AI_API_KEY no configurado request_id=%s", request_id)
+        return {}
+
+    system_prompt = (
+        "Eres un extractor estructurado de datos para formularios BPMN. "
+        "Debes responder UNICAMENTE con un JSON objeto clave-valor. "
+        "Reglas: 1) Usa solo claves incluidas en form_fields. "
+        "2) No agregues explicaciones, markdown ni texto extra. "
+        "3) Si no puedes inferir un campo con confianza, omítelo. "
+        "4) No inventes campos."
+    )
+    user_payload = {
+        "form_fields": fields,
+        "voice_transcript": transcript,
+    }
+
+    try:
+        completion = None
+        last_error: Exception | None = None
+        selected_model = ""
+        for model in _resolve_model_candidates([]):
+            try:
+                completion = openai_client.chat.completions.create(
+                    model=model,
+                    temperature=0,
+                    response_format={"type": "json_object"},
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": json.dumps(user_payload, ensure_ascii=True)},
+                    ],
+                )
+                selected_model = model
+                break
+            except Exception as model_exception:
+                last_error = model_exception
+                continue
+
+        if completion is None:
+            if last_error is not None:
+                raise last_error
+            raise RuntimeError("No se obtuvo respuesta de ningun modelo configurado.")
+
+        raw = (completion.choices[0].message.content or "").strip()
+        parsed = json.loads(raw) if raw else {}
+        if not isinstance(parsed, dict):
+            return {}
+
+        allowed = set(fields)
+        filtered = {k: v for k, v in parsed.items() if isinstance(k, str) and k in allowed}
+        logger.info("voice_fill success request_id=%s model=%s keys=%s", request_id, selected_model, len(filtered))
+        return filtered
+    except Exception as exception:
+        logger.exception("voice_fill error request_id=%s", request_id)
+        raise HTTPException(
+            status_code=502,
+            detail=f"voice_fill.failed request_id={request_id}: {exception.__class__.__name__}: {exception}",
+        ) from exception
 
 
 @app.post("/api/v1/agent/diagram", response_model=AgentResult)

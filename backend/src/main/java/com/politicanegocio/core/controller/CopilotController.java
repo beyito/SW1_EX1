@@ -5,6 +5,7 @@ import com.politicanegocio.core.dto.CopilotApplyRequestDto;
 import com.politicanegocio.core.dto.CopilotApplyResponseDto;
 import com.politicanegocio.core.dto.CopilotConversationDto;
 import com.politicanegocio.core.dto.CopilotResponseDto;
+import com.politicanegocio.core.dto.VoiceFillRequestDto;
 import com.politicanegocio.core.model.User;
 import com.politicanegocio.core.service.CopilotService;
 import org.slf4j.Logger;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestParam;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/copilot")
@@ -66,5 +68,11 @@ public class CopilotController {
                 request != null && request.currentDiagram() != null
         );
         return ResponseEntity.ok(copilotService.apply(request));
+    }
+
+    @PostMapping("/voice-fill")
+    @PreAuthorize("hasAnyAuthority('COMPANY_ADMIN','SOFTWARE_ADMIN','FUNCTIONARY','CLIENT')")
+    public ResponseEntity<Map<String, Object>> voiceFill(@RequestBody VoiceFillRequestDto request) {
+        return ResponseEntity.ok(copilotService.fillFormFromVoice(request));
     }
 }
