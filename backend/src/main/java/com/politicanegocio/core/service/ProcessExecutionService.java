@@ -18,8 +18,10 @@ import com.politicanegocio.core.repository.TaskInstanceRepository;
 import com.politicanegocio.core.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -98,24 +100,24 @@ public class ProcessExecutionService {
 
     public TaskInstance completeTask(String taskInstanceId, String formData, User user) {
         TaskInstance taskInstance = taskInstanceRepository.findById(taskInstanceId)
-                .orElseThrow(() -> new RuntimeException("Tarea no encontrada con ID: " + taskInstanceId));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tarea no encontrada con ID: " + taskInstanceId));
         assertUserCanAccessTask(user, taskInstance);
         String username = user.getUsername();
 
         if (taskInstance.getStatus() == TaskInstanceStatus.PENDING) {
-            throw new RuntimeException("Debes tomar la tarea antes de completarla");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Debes tomar la tarea antes de completarla");
         }
         if (taskInstance.getStatus() == TaskInstanceStatus.COMPLETED) {
-            throw new RuntimeException("La tarea ya fue completada");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La tarea ya fue completada");
         }
         if (taskInstance.getStatus() != TaskInstanceStatus.IN_PROGRESS) {
-            throw new RuntimeException("Solo se pueden completar tareas en estado IN_PROGRESS");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Solo se pueden completar tareas en estado IN_PROGRESS");
         }
         if (taskInstance.getStartedAt() == null) {
-            throw new RuntimeException("La tarea no tiene fecha de inicio registrada");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La tarea no tiene fecha de inicio registrada");
         }
         if (taskInstance.getAssignedTo() != null && !taskInstance.getAssignedTo().equals(username)) {
-            throw new RuntimeException("La tarea esta siendo ejecutada por otro usuario");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "La tarea esta siendo ejecutada por otro usuario");
         }
 
         // ==========================================================
@@ -123,7 +125,7 @@ public class ProcessExecutionService {
         // ==========================================================
         try {
             ProcessInstance processInstance = processInstanceRepository.findById(taskInstance.getProcessInstanceId())
-                    .orElseThrow(() -> new RuntimeException("Instancia de proceso no encontrada"));
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Instancia de proceso no encontrada"));
 
             String schemaRaw = workflowEngine.getFormSchemaForNode(processInstance.getPolicyId(), taskInstance.getTaskId());
             
@@ -152,14 +154,14 @@ public class ProcessExecutionService {
                     if (isRequired && fieldKey != null) {
                         if (dataNode.isEmpty() || !dataNode.has(fieldKey) || dataNode.get(fieldKey).asText().trim().isEmpty()) {
                             String fieldLabel = field.has("label") ? field.get("label").asText() : fieldKey;
-                            throw new RuntimeException("Validación fallida: El campo '" + fieldLabel + "' es obligatorio.");
+                            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Validacion fallida: El campo '" + fieldLabel + "' es obligatorio.");
                         }
                     }
                 }
             }
         } catch (Exception e) {
-            if (e instanceof RuntimeException) throw (RuntimeException) e;
-            throw new RuntimeException("Error interno al procesar el formulario: " + e.getMessage());
+            if (e instanceof ResponseStatusException) throw (ResponseStatusException) e;
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Error al procesar el formulario: " + e.getMessage(), e);
         }
         // ==========================================================
         // 🚩 FIN DE LA VALIDACIÓN
@@ -174,7 +176,7 @@ public class ProcessExecutionService {
         TaskInstance completedTask = taskInstanceRepository.save(taskInstance);
 
         ProcessInstance processInstance = processInstanceRepository.findById(taskInstance.getProcessInstanceId())
-                .orElseThrow(() -> new RuntimeException("Instancia de proceso no encontrada"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Instancia de proceso no encontrada"));
         Map<String, Object> routingVariables = parseRoutingVariables(formData);
 
         List<WorkflowEngine.WorkflowNode> nextNodes = workflowEngine.getNextNodes(
@@ -837,21 +839,21 @@ public class ProcessExecutionService {
 
     private void assertUserCanAccessTask(User user, TaskInstance taskInstance) {
         if (user == null || taskInstance == null) {
-            throw new RuntimeException("Acceso denegado a la tarea");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Acceso denegado a la tarea");
         }
         ProcessInstance processInstance = processInstanceRepository.findById(taskInstance.getProcessInstanceId())
-                .orElseThrow(() -> new RuntimeException("Instancia de proceso no encontrada"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Instancia de proceso no encontrada"));
 
         if (isClientUser(user)) {
             String username = user.getUsername() == null ? "" : user.getUsername().trim();
             String startedBy = processInstance.getStartedBy() == null ? "" : processInstance.getStartedBy().trim();
             if (!username.equals(startedBy)) {
-                throw new RuntimeException("No tienes permisos para acceder a esta tarea");
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes permisos para acceder a esta tarea");
             }
             String userLane = resolveUserLaneId(user);
             String taskLane = normalizeLaneId(taskInstance.getLaneId());
             if (!userLane.equals(taskLane)) {
-                throw new RuntimeException("La tarea no pertenece a tu carril");
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "La tarea no pertenece a tu carril");
             }
             return;
         }
@@ -861,7 +863,7 @@ public class ProcessExecutionService {
         boolean isAssignedToUser = taskInstance.getAssignedTo() != null
                 && taskInstance.getAssignedTo().equals(user.getUsername());
         if (!isAssignedToUser && !userLane.equals(taskLane)) {
-            throw new RuntimeException("No tienes permisos para acceder a esta tarea");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes permisos para acceder a esta tarea");
         }
     }
 }
