@@ -40,7 +40,7 @@ services:
       MAX_REQUEST_SIZE: ${MAX_REQUEST_SIZE}
       AI_ENGINE_BASE_URL: ${AI_ENGINE_BASE_URL}
       JAVA_OPTS: ${JAVA_OPTS}
-      FIREBASE_CREDENTIALS_PATH: /app/secrets/firebase-service-account.json
+      FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH}
 
     ports:
       - "8080:8080"
