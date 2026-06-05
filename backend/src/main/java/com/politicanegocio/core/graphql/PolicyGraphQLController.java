@@ -2,6 +2,7 @@ package com.politicanegocio.core.graphql;
 
 import com.politicanegocio.core.model.Lane;
 import com.politicanegocio.core.model.Policy;
+import com.politicanegocio.core.model.PolicyInitialRequirement;
 import com.politicanegocio.core.model.TaskExecutionOrder;
 import com.politicanegocio.core.service.PolicyService;
 import org.springframework.graphql.data.method.annotation.Argument;
@@ -23,8 +24,12 @@ public class PolicyGraphQLController {
 
     @MutationMapping
     @PreAuthorize("hasAuthority('COMPANY_ADMIN')")
-    public Policy createPolicy(@Argument String name, @Argument String description) {
-        return policyService.createPolicy(name, description);
+    public Policy createPolicy(
+            @Argument String name,
+            @Argument String description,
+            @Argument List<PolicyInitialRequirement> initialRequirements
+    ) {
+        return policyService.createPolicy(name, description, initialRequirements);
     }
 
     @QueryMapping
@@ -47,8 +52,9 @@ public class PolicyGraphQLController {
     public Policy updatePolicyGraph(
             @Argument String policyId,
             @Argument String diagramJson,
-            @Argument List<Lane> lanes
+            @Argument List<Lane> lanes,
+            @Argument List<PolicyInitialRequirement> initialRequirements
     ) {
-        return policyService.updatePolicyGraph(policyId, diagramJson, lanes);
+        return policyService.updatePolicyGraph(policyId, diagramJson, lanes, initialRequirements);
     }
 }

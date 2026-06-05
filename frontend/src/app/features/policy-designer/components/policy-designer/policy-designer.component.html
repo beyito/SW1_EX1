@@ -6,7 +6,7 @@
 
     <header class="designer-header">
       <h1>Disenador BPMN</h1>
-      <p class="section-hint">Politica: {{ policyName || selectedPolicyId || 'Sin nombre' }}</p>
+      <p class="section-hint">Política: {{ policyName || selectedPolicyId || 'Sin nombre' }}</p>
       <p class="section-hint">ID: {{ selectedPolicyId || 'Sin id' }}</p>
     </header>
 
@@ -14,7 +14,7 @@
       <p class="section-title">GESTOR DE CARRILES</p>
       <div class="lane-input">
         <select [(ngModel)]="selectedAreaId">
-          <option value="">Seleccionar area</option>
+          <option value="">Seleccionar área</option>
           <option *ngFor="let area of availableAreas" [value]="area.id">{{ area.name }}</option>
         </select>
         <button type="button" class="add-btn" (click)="addLane()" [disabled]="!selectedAreaId">Agregar</button>
@@ -38,6 +38,49 @@
         </article>
       </div>
       <p *ngIf="lanes.length === 0" class="empty-text">Aun no hay carriles definidos.</p>
+    </section>
+
+    <section class="block">
+      <p class="section-title">REQUISITOS INICIALES</p>
+      <p class="section-hint">Define documentos requeridos u opcionales para iniciar el trámite.</p>
+
+      <div class="form-grid">
+        <label>
+          Nombre
+          <input type="text" [(ngModel)]="newRequirementName" placeholder="Carnet de Identidad" />
+        </label>
+        <label>
+          Descripcion
+          <input type="text" [(ngModel)]="newRequirementDescription" placeholder="Documento vigente del solicitante" />
+        </label>
+        <label>
+          Extensiones permitidas (coma)
+          <input type="text" [(ngModel)]="newRequirementExtensions" placeholder="pdf,jpg,png" />
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" [(ngModel)]="newRequirementRequired" />
+          Obligatorio
+        </label>
+      </div>
+
+      <button type="button" class="wide-button action-positive" (click)="addInitialRequirement()">Agregar requisito</button>
+
+      <div class="fields-list" *ngIf="initialRequirements.length > 0">
+        <div class="field-item" *ngFor="let requirement of initialRequirements; trackBy: trackByRequirementId">
+          <div class="field-header">
+            <span class="field-type">{{ requirement.required ? 'Obligatorio' : 'Opcional' }}</span>
+            <span class="field-label">{{ requirement.name }}</span>
+            <div class="field-actions">
+              <button type="button" class="small-btn danger-btn" (click)="removeInitialRequirement(requirement.id)">x</button>
+            </div>
+          </div>
+          <div class="field-details">
+            <span class="field-badge attachment">
+              {{ requirement.allowedExtensions?.join(', ') || 'sin restriccion' }}
+            </span>
+          </div>
+        </div>
+      </div>
     </section>
 
     <section class="block">
@@ -207,7 +250,7 @@
       <p class="info-text">{{ infoMessage }}</p>
       <p class="info-detail"><strong>Origen:</strong> {{ selectedSourceId ?? 'ninguno' }}</p>
       <p class="info-detail"><strong>Destino:</strong> {{ selectedTargetId ?? 'ninguno' }}</p>
-      <p class="info-detail"><strong>Conexion:</strong> {{ isConnectionMode ? 'activa' : 'inactiva' }}</p>
+      <p class="info-detail"><strong>Conexión:</strong> {{ isConnectionMode ? 'activa' : 'inactiva' }}</p>
     </section>
 
     <section class="block" *ngIf="showTaskOrder && taskExecutionOrder">
@@ -215,7 +258,7 @@
         <h3>Orden de ejecucion de tareas</h3>
         <button type="button" class="close-btn" (click)="hideTaskOrder()">x</button>
       </div>
-      <p class="policy-name"><strong>Politica:</strong> {{ taskExecutionOrder.policyName }}</p>
+      <p class="policy-name"><strong>Política:</strong> {{ taskExecutionOrder.policyName }}</p>
 
       <div class="task-list">
         <div class="task-item" *ngFor="let task of taskExecutionOrder.tasks; trackBy: trackByTaskId">

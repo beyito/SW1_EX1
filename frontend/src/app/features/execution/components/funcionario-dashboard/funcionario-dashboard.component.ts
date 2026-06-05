@@ -3,7 +3,7 @@ import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../../../auth.service';
-import { ProcessTaskDto, ProcessTaskGroupDto, StartablePolicyDto } from '../../models/execution.models';
+import { DocumentDto, ProcessTaskDto, ProcessTaskGroupDto, StartablePolicyDto } from '../../models/execution.models';
 import { ExecutionService } from '../../services/execution.service';
 
 @Component({
@@ -26,6 +26,10 @@ export class FuncionarioDashboardComponent implements OnInit {
   public startingPolicyId: string | null = null;
   public message = '';
   public startDrafts: Record<string, { title: string; description: string }> = {};
+  public documentsOpen = false;
+  public documentsLoading = false;
+  public processDocuments: DocumentDto[] = [];
+  public documentsMessage = '';
 
   public ngOnInit(): void {
     void this.loadDashboardData();
@@ -48,7 +52,7 @@ export class FuncionarioDashboardComponent implements OnInit {
       this.processGroups = [];
       this.selectedProcessId = null;
       this.loading = false;
-      this.message = 'Tu usuario no tiene area/lane asignada.';
+      this.message = 'Tu usuario no tiene área/carril asignado.';
       this.cdr.detectChanges();
       return;
     }
@@ -75,6 +79,9 @@ export class FuncionarioDashboardComponent implements OnInit {
 
   public selectProcess(group: ProcessTaskGroupDto): void {
     this.selectedProcessId = group.processInstanceId;
+    this.documentsOpen = false;
+    this.processDocuments = [];
+    this.documentsMessage = '';
   }
 
   public draftFor(policy: StartablePolicyDto): { title: string; description: string } {
@@ -93,7 +100,7 @@ export class FuncionarioDashboardComponent implements OnInit {
   public async startProcess(policy: StartablePolicyDto): Promise<void> {
     this.startingPolicyId = policy.id;
     this.message = '';
-    this.cdr.detectChanges(); 
+    this.cdr.detectChanges();
 
     try {
       const draft = this.draftFor(policy);
@@ -106,12 +113,52 @@ export class FuncionarioDashboardComponent implements OnInit {
       this.message = error instanceof Error ? error.message : 'No se pudo iniciar el proceso';
     } finally {
       this.startingPolicyId = null;
-      this.cdr.detectChanges(); 
+      this.cdr.detectChanges();
     }
   }
 
   public openTask(task: ProcessTaskDto): void {
     void this.router.navigate(['/execution/task', task.taskInstanceId]);
+  }
+
+  public async openDocumentsForSelectedProcess(): Promise<void> {
+    if (!this.selectedProcess) {
+      return;
+    }
+
+    this.documentsOpen = true;
+    this.documentsLoading = true;
+    this.documentsMessage = '';
+    this.processDocuments = [];
+    this.cdr.detectChanges();
+
+    try {
+      this.processDocuments = await this.executionService.getProcessDocuments(this.selectedProcess.processInstanceId);
+      if (this.processDocuments.length === 0) {
+        this.documentsMessage = 'No hay documentos visibles para ti en esta instancia de trámite.';
+      }
+    } catch (error) {
+      this.documentsMessage = error instanceof Error ? error.message : 'No se pudieron cargar los documentos.';
+    } finally {
+      this.documentsLoading = false;
+      this.cdr.detectChanges();
+    }
+  }
+
+  public closeDocumentsPanel(): void {
+    this.documentsOpen = false;
+  }
+
+  public viewDocument(document: DocumentDto): void {
+    void this.router.navigate(['/documents', document.id]);
+  }
+
+  public editDocument(document: DocumentDto): void {
+    if (!document.canEdit) {
+      this.documentsMessage = 'No tienes privilegios para editar este documento.';
+      return;
+    }
+    void this.router.navigate(['/documents', document.id], { queryParams: { edit: '1' } });
   }
 
   public statusLabel(status: string): string {

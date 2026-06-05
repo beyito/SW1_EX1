@@ -41,6 +41,15 @@ export interface StartablePolicyDto {
   id: string;
   name: string;
   description?: string;
+  initialRequirements?: PolicyInitialRequirement[];
+}
+
+export interface PolicyInitialRequirement {
+  id: string;
+  name: string;
+  description?: string;
+  required: boolean;
+  allowedExtensions?: string[];
 }
 
 export interface ProcessTaskDto {
@@ -78,6 +87,7 @@ export interface TaskFormField {
 
 export interface TaskDetailDto {
   id: string;
+  processInstanceId?: string;
   policyId?: string;
   taskId?: string;
   taskName: string;
@@ -87,4 +97,23 @@ export interface TaskDetailDto {
   formSchema: string;
   formData?: string | null;
   diagramJson?: string;
+}
+
+export interface DocumentDto {
+  id: string;
+  processInstanceId: string;
+  documentCode?: string;
+  fileName: string;
+  contentType: string;
+  size: number;
+  url: string;
+  createdAt?: string;
+  updatedAt?: string;
+  canEdit?: boolean;
+  canDelete?: boolean;
+}
+
+export interface OnlyOfficeConfigDto {
+  documentServerUrl: string;
+  config: Record<string, unknown>;
 }

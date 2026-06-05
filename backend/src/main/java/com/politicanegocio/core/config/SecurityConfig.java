@@ -58,7 +58,14 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**", "/graphiql/**", "/error", "/ws-designer", "/ws-designer/**").permitAll()
+                .requestMatchers(
+                    "/api/auth/**",
+                    "/api/onlyoffice/callback/**",
+                    "/graphiql/**",
+                    "/error",
+                    "/ws-designer",
+                    "/ws-designer/**"
+                ).permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(authTokenFilter, UsernamePasswordAuthenticationFilter.class);

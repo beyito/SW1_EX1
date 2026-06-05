@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { executeGraphql } from '../../../core/api/graphql-client';
-import { Lane, PolicyPayload, PolicySummary, TaskExecutionOrder } from '../models/policy-designer.models';
+import { Lane, PolicyInitialRequirement, PolicyPayload, PolicySummary, TaskExecutionOrder } from '../models/policy-designer.models';
 
 @Injectable({ providedIn: 'root' })
 export class PolicyDataService {
@@ -14,6 +14,13 @@ export class PolicyDataService {
           id
           name
           description
+          initialRequirements {
+            id
+            name
+            description
+            required
+            allowedExtensions
+          }
         }
       }
     `);
@@ -34,6 +41,13 @@ export class PolicyDataService {
             name
             description
             diagramJson
+            initialRequirements {
+              id
+              name
+              description
+              required
+              allowedExtensions
+            }
             lanes {
               id
               name
@@ -60,21 +74,37 @@ export class PolicyDataService {
     }
   }
 
-  public async createPolicy(name: string, description: string): Promise<PolicySummary> {
+  public async createPolicy(
+    name: string,
+    description: string,
+    initialRequirements: PolicyInitialRequirement[] = []
+  ): Promise<PolicySummary> {
     const response = await executeGraphql<{ createPolicy: PolicySummary }>(`
-      mutation CreatePolicy($name: String!, $description: String) {
-        createPolicy(name: $name, description: $description) {
+      mutation CreatePolicy($name: String!, $description: String, $initialRequirements: [PolicyInitialRequirementInput!]) {
+        createPolicy(name: $name, description: $description, initialRequirements: $initialRequirements) {
           id
           name
           description
+          initialRequirements {
+            id
+            name
+            description
+            required
+            allowedExtensions
+          }
         }
       }
-    `, { name, description });
+    `, { name, description, initialRequirements });
 
     return response.createPolicy;
   }
 
-  public async updatePolicyDiagram(policyId: string, diagramJson: string, lanes: Lane[]): Promise<void> {
+  public async updatePolicyDiagram(
+    policyId: string,
+    diagramJson: string,
+    lanes: Lane[],
+    initialRequirements: PolicyInitialRequirement[] = []
+  ): Promise<void> {
     const lanePayload = lanes.map((lane) =>
       this.laneWidthSupported && this.laneHeightSupported
         ? lane
@@ -87,13 +117,13 @@ export class PolicyDataService {
     );
 
     await executeGraphql<{ updatePolicyGraph: PolicySummary }>(`
-      mutation UpdatePolicyGraph($policyId: ID!, $diagramJson: String!, $lanes: [LaneInput!]) {
-        updatePolicyGraph(policyId: $policyId, diagramJson: $diagramJson, lanes: $lanes) {
+      mutation UpdatePolicyGraph($policyId: ID!, $diagramJson: String!, $lanes: [LaneInput!], $initialRequirements: [PolicyInitialRequirementInput!]) {
+        updatePolicyGraph(policyId: $policyId, diagramJson: $diagramJson, lanes: $lanes, initialRequirements: $initialRequirements) {
           id
           name
         }
       }
-    `, { policyId, diagramJson, lanes: lanePayload });
+    `, { policyId, diagramJson, lanes: lanePayload, initialRequirements });
   }
 
  public async getTaskExecutionOrder(policyId: string): Promise<TaskExecutionOrder | null> {
@@ -126,6 +156,13 @@ export class PolicyDataService {
           name
           description
           diagramJson
+          initialRequirements {
+            id
+            name
+            description
+            required
+            allowedExtensions
+          }
           lanes {
             id
             name

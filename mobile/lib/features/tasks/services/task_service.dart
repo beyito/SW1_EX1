@@ -98,12 +98,20 @@ class TaskService {
     }
   }
 
-  Future<String> uploadFileToS3(String filePath, {String? policyId}) async {
+  Future<String> uploadFileToS3(
+    String filePath, {
+    String? policyId,
+    String? processInstanceId,
+    String? documentId,
+  }) async {
     try {
       final filename = filePath.split(RegExp(r'[\\/]')).last;
       final formData = FormData.fromMap({
         'file': await dio.MultipartFile.fromFile(filePath, filename: filename),
         if (policyId != null && policyId.trim().isNotEmpty) 'policyId': policyId.trim(),
+        if (processInstanceId != null && processInstanceId.trim().isNotEmpty)
+          'processInstanceId': processInstanceId.trim(),
+        if (documentId != null && documentId.trim().isNotEmpty) 'documentId': documentId.trim(),
       });
 
       final response = await _apiClient.dio.post('/api/files/upload', data: formData);

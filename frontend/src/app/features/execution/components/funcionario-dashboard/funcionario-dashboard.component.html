@@ -13,20 +13,20 @@
     @if (loading) {
       <p class="hint">Cargando procesos...</p>
     } @else if (startablePolicies.length === 0) {
-      <p class="hint">No hay procesos que puedas iniciar en tu area.</p>
+      <p class="hint">No hay procesos que puedas iniciar en tu área.</p>
     } @else {
       <div class="policy-grid">
         @for (policy of startablePolicies; track policy.id) {
           <article class="policy-card">
             <h4>{{ policy.name }}</h4>
-            <p>{{ policy.description || 'Sin descripcion' }}</p>
+            <p>{{ policy.description || 'Sin descripción' }}</p>
             <div class="start-form">
               <label>
-                Titulo de instancia
+                Título de instancia
                 <input type="text" [(ngModel)]="draftFor(policy).title" maxlength="120" />
               </label>
               <label>
-                Descripcion
+                Descripción
                 <textarea rows="2" [(ngModel)]="draftFor(policy).description" maxlength="300"></textarea>
               </label>
             </div>
@@ -51,7 +51,7 @@
     @if (loading) {
       <p class="hint">Cargando procesos activos...</p>
     } @else if (processGroups.length === 0) {
-      <p class="hint">No tienes procesos activos con tareas en tu area.</p>
+      <p class="hint">No tienes procesos activos con tareas en tu área.</p>
     } @else {
       <div class="process-task-layout">
         <aside class="process-list">
@@ -79,7 +79,7 @@
             </header>
 
             @if (selectedProcess.tasks.length === 0) {
-              <p class="hint">Este proceso no tiene tareas visibles para tu area.</p>
+              <p class="hint">Este proceso no tiene tareas visibles para tu área.</p>
             } @else {
               <table class="tasks-table">
                 <thead>
@@ -102,9 +102,54 @@
                 </tbody>
               </table>
             }
+
+            <button class="documents-fab" type="button" (click)="openDocumentsForSelectedProcess()">
+              Documentos
+            </button>
           }
         </section>
       </div>
     }
   </section>
+
+  @if (documentsOpen) {
+    <aside class="documents-drawer" aria-label="Documentos del trámite">
+      <header>
+        <div>
+          <p>Documentos del trámite</p>
+          <h4>{{ selectedProcess?.processTitle }}</h4>
+        </div>
+        <button type="button" class="close-button" (click)="closeDocumentsPanel()">Cerrar</button>
+      </header>
+
+      @if (documentsLoading) {
+        <p class="hint">Cargando documentos...</p>
+      } @else {
+        @if (documentsMessage) {
+          <p class="documents-message">{{ documentsMessage }}</p>
+        }
+
+        <div class="document-list">
+          @for (document of processDocuments; track document.id) {
+            <article class="document-item">
+              <div>
+                <strong>{{ document.fileName }}</strong>
+                <span>{{ document.contentType || 'Documento' }} · {{ document.size | number }} bytes</span>
+              </div>
+              <div class="document-actions">
+                <button type="button" (click)="viewDocument(document)">Ver</button>
+                @if (document.canEdit) {
+                  <button type="button" class="edit" (click)="editDocument(document)">Editar</button>
+                } @else {
+                  <button type="button" disabled>Sin permiso de edición</button>
+                }
+              </div>
+            </article>
+          } @empty {
+            <p class="hint">No hay documentos visibles para ti en esta instancia.</p>
+          }
+        </div>
+      }
+    </aside>
+  }
 </div>

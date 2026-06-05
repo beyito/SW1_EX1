@@ -1,0 +1,46 @@
+<section class="document-viewer-page">
+  @if (loading) {
+    <p class="message">Cargando documento...</p>
+  } @else if (document) {
+    <article class="document-card">
+      <div class="file-badge">
+        <span>{{ document.fileName.split('.').pop()?.toUpperCase() || 'DOC' }}</span>
+      </div>
+
+      <div class="document-info">
+        <p class="eyebrow">Documento DMS</p>
+        <h2>{{ document.fileName }}</h2>
+        <p>{{ document.contentType || 'Documento' }}</p>
+        <small>{{ document.size | number }} bytes</small>
+      </div>
+
+      <div class="toolbar-actions">
+        <a class="btn" [href]="document.url" target="_blank" rel="noopener">Descargar</a>
+        @if (canTryEditor()) {
+          <button class="btn btn-onlyoffice" type="button" (click)="openOnlyOfficeEditor()" [disabled]="onlyOfficeLoading">
+            {{ onlyOfficeLoading ? 'Abriendo editor...' : 'Iniciar edición' }}
+          </button>
+        }
+      </div>
+    </article>
+
+    <section class="document-placeholder">
+      <h3>Vista previa no intrusiva</h3>
+      <p>Este panel no descarga automáticamente el archivo. Para modificarlo, inicia una sesión de edición colaborativa.</p>
+    </section>
+  }
+
+  @if (message) {
+    <p class="message">{{ message }}</p>
+  }
+
+  @if (onlyOfficeOpen) {
+    <section class="onlyoffice-overlay">
+      <header class="onlyoffice-toolbar">
+        <strong>{{ document?.fileName }}</strong>
+        <button type="button" class="btn" (click)="closeOnlyOfficeEditor()">Cerrar OnlyOffice</button>
+      </header>
+      <div id="onlyoffice-placeholder"></div>
+    </section>
+  }
+</section>

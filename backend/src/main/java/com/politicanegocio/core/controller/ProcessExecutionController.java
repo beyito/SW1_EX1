@@ -125,7 +125,12 @@ public class ProcessExecutionController {
     }
 
     private StartablePolicyDto toStartablePolicyDto(Policy policy) {
-        return new StartablePolicyDto(policy.getId(), policy.getName(), policy.getDescription());
+        return new StartablePolicyDto(
+                policy.getId(),
+                policy.getName(),
+                policy.getDescription(),
+                policy.getInitialRequirements()
+        );
     }
 
     private record StartProcessRequest(String policyId, String title, String description) {

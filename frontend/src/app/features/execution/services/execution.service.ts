@@ -1,7 +1,9 @@
-import { Injectable, inject } from '@angular/core';
+Ôªøimport { Injectable, inject } from '@angular/core';
 import { AuthService } from '../../../auth.service';
 import {
   PendingTaskDto,
+  DocumentDto,
+  OnlyOfficeConfigDto,
   ProcessTaskGroupDto,
   ProcessInstance,
   StartablePolicyDto,
@@ -149,11 +151,14 @@ export class ExecutionService {
     return headers;
   }
 
-  public async uploadFile(file: File, policyId?: string): Promise<any> {
+  public async uploadFile(file: File, processInstanceId?: string, documentId?: string): Promise<any> {
     const formData = new FormData();
     formData.append('file', file);
-    if (policyId) {
-      formData.append('policyId', policyId);
+    if (processInstanceId) {
+      formData.append('processInstanceId', processInstanceId);
+    }
+    if (documentId) {
+      formData.append('documentId', documentId);
     }
 
     const headers: Record<string, string> = { ...this.authHeaders };
@@ -173,20 +178,82 @@ export class ExecutionService {
     return response.json();
   }
 
+  public async getDocument(documentId: string): Promise<DocumentDto> {
+    const response = await fetch(`/api/documents/${encodeURIComponent(documentId)}`, {
+      headers: this.authHeaders
+    });
+
+    if (!response.ok) {
+      throw new Error(await this.readDocumentError(response, 'No se pudo cargar el documento'));
+    }
+
+    return response.json();
+  }
+
+  public async getProcessDocuments(processInstanceId: string): Promise<DocumentDto[]> {
+    const response = await fetch(`/api/documents/process/${encodeURIComponent(processInstanceId)}`, {
+      headers: this.authHeaders
+    });
+
+    if (!response.ok) {
+      throw new Error(await this.readDocumentError(response, 'No se pudieron cargar los documentos del tr√°mite'));
+    }
+
+    return response.json();
+  }
+
+  public async getOnlyOfficeConfig(documentId: string): Promise<OnlyOfficeConfigDto> {
+    const response = await fetch(`/api/onlyoffice/config/${encodeURIComponent(documentId)}`, {
+      headers: this.authHeaders
+    });
+
+    if (!response.ok) {
+      throw new Error(await this.readDocumentError(response, 'No se pudo abrir el editor'));
+    }
+
+    return response.json();
+  }
+
+  private async readDocumentError(response: Response, fallback: string): Promise<string> {
+    if (response.status === 403) {
+      return 'No tienes privilegios suficientes para realizar esta acci√≥n sobre el documento. Solicita acceso al administrador de empresa.';
+    }
+    if (response.status === 404) {
+      return 'El documento no existe o ya no est√° disponible.';
+    }
+    const raw = await response.text();
+    const parsed = this.extractErrorMessage(raw);
+    return parsed || fallback;
+  }
+
+  private extractErrorMessage(raw: string): string {
+    const text = (raw ?? '').trim();
+    if (!text) {
+      return '';
+    }
+    try {
+      const parsed = JSON.parse(text) as { detail?: string; message?: string; error?: string };
+      return parsed.detail || parsed.message || parsed.error || '';
+    } catch {
+      return text;
+    }
+  }
+
   private mapAiError(status: number, raw: string, fallback: string): string {
     if (status === 503) {
-      return 'El servicio de IA no est· disponible en este momento. Intenta nuevamente en unos minutos.';
+      return 'El servicio de IA no est√° disponible en este momento. Intenta nuevamente en unos minutos.';
     }
     if (status === 504) {
-      return 'El servicio de IA est· saturado o demorÛ demasiado en responder. Intenta nuevamente.';
+      return 'El servicio de IA est√° saturado o demor√≥ demasiado en responder. Intenta nuevamente.';
     }
     if (status === 502) {
-      return 'El servicio de IA devolviÛ una respuesta inv·lida. Intenta nuevamente.';
+      return 'El servicio de IA devolvi√≥ una respuesta inv√°lida. Intenta nuevamente.';
     }
     if (status >= 500) {
-      return 'OcurriÛ un error temporal en el servicio de IA. Intenta nuevamente.';
+      return 'Ocurri√≥ un error temporal en el servicio de IA. Intenta nuevamente.';
     }
     const text = (raw ?? '').trim();
     return text || fallback;
   }
 }
+

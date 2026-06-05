@@ -60,7 +60,7 @@
                 <td>{{ admin.company }}</td>
                 <td class="actions-cell">
                   @if (editingAdminId === admin.id) {
-                    <input type="password" [(ngModel)]="editingAdminPassword" placeholder="Nueva contrasena (opcional)" />
+                    <input type="password" [(ngModel)]="editingAdminPassword" placeholder="Nueva contraseña (opcional)" />
                     <button type="button" class="btn-secondary" (click)="saveAdmin(admin.id)" [disabled]="adminLoading">Guardar</button>
                     <button type="button" class="btn-secondary" (click)="cancelEditAdmin()" [disabled]="adminLoading">Cancelar</button>
                   } @else {

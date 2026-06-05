@@ -1,0 +1,64 @@
+<section class="dms-admin-page">
+  <header class="dms-hero">
+    <p>Seguridad documental</p>
+    <h2>Privilegios por documento</h2>
+    <span>Define que funcionario puede ver, editar o eliminar cada archivo del DMS.</span>
+  </header>
+
+  @if (loading) {
+    <p class="message">Cargando documentos y funcionarios...</p>
+  } @else {
+    <section class="control-card">
+      <label>
+        Documento
+        <select [(ngModel)]="selectedDocumentId" (change)="onDocumentChange()">
+          @for (document of documents; track document.id) {
+            <option [value]="document.id">{{ document.fileName }}</option>
+          }
+        </select>
+      </label>
+
+      @if (selectedDocument) {
+        <div class="document-summary">
+          <strong>{{ selectedDocument.fileName }}</strong>
+        <span>Trámite: {{ selectedDocument.processInstanceId }}</span>
+        </div>
+      }
+    </section>
+
+    <section class="table-card">
+      <table>
+        <thead>
+          <tr>
+            <th>Funcionario</th>
+            <th>Area</th>
+            <th>Ver</th>
+            <th>Editar</th>
+            <th>Eliminar</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (user of functionaries; track user.id) {
+            <tr>
+              <td>{{ user.username }}</td>
+              <td>{{ user.area || '-' }}</td>
+              <td><input type="checkbox" [(ngModel)]="permissionFor(user).canView" /></td>
+              <td><input type="checkbox" [(ngModel)]="permissionFor(user).canEdit" /></td>
+              <td><input type="checkbox" [(ngModel)]="permissionFor(user).canDelete" /></td>
+              <td>
+                <button type="button" (click)="savePermission(user)" [disabled]="savingUserId === user.id">
+                  {{ savingUserId === user.id ? 'Guardando...' : 'Guardar' }}
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </section>
+  }
+
+  @if (message) {
+    <p class="message">{{ message }}</p>
+  }
+</section>

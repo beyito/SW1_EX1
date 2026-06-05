@@ -6,11 +6,12 @@ services:
     container_name: bpmn-frontend
     ports:
       - "80:80"
-      - "443:443"      # <-- NUEVO: Abrimos el puerto HTTPS
-    volumes:           # <-- NUEVO: Le pasamos los certificados al contenedor
-      - /etc/letsencrypt:/etc/letsencrypt:ro
+      # - "443:443"      # <-- NUEVO: Abrimos el puerto HTTPS
+    # volumes:           # <-- NUEVO: Le pasamos los certificados al contenedor
+      # - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       - backend
+      - onlyoffice
     networks:
       - bpmn-net
 
@@ -26,6 +27,7 @@ services:
     environment:
       SPRING_DATA_MONGODB_URI: ${MONGODB_URI}
       APP_PUBLIC_BASE_URL: ${APP_PUBLIC_BASE_URL}
+      APP_BACKEND_PUBLIC_BASE_URL: ${APP_BACKEND_PUBLIC_BASE_URL:-http://backend:8080}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
       SPRING_RABBITMQ_HOST: ${SPRING_RABBITMQ_HOST}
       SPRING_RABBITMQ_STOMP_PORT: ${SPRING_RABBITMQ_STOMP_PORT}
@@ -39,6 +41,9 @@ services:
       MAX_UPLOAD_SIZE: ${MAX_UPLOAD_SIZE}
       MAX_REQUEST_SIZE: ${MAX_REQUEST_SIZE}
       AI_ENGINE_BASE_URL: ${AI_ENGINE_BASE_URL}
+      ONLYOFFICE_DOCUMENT_SERVER_URL: ${ONLYOFFICE_DOCUMENT_SERVER_URL:-http://localhost:8082}
+      ONLYOFFICE_INTERNAL_DOCUMENT_SERVER_URL: ${ONLYOFFICE_INTERNAL_DOCUMENT_SERVER_URL:-http://onlyoffice}
+      ONLYOFFICE_PRESIGNED_URL_HOURS: ${ONLYOFFICE_PRESIGNED_URL_HOURS:-2}
       JAVA_OPTS: ${JAVA_OPTS}
       FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH}
 
@@ -49,6 +54,21 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      onlyoffice:
+        condition: service_started
+    networks:
+      - bpmn-net
+
+  onlyoffice:
+    image: onlyoffice/documentserver:latest
+    container_name: bpmn-onlyoffice
+    environment:
+      JWT_ENABLED: "false"
+      USE_UNAUTHORIZED_STORAGE: "true"
+      ALLOW_PRIVATE_IP_ADDRESS: "true"
+      ALLOW_META_IP_ADDRESS: "true"
+    ports:
+      - "8082:80"
     networks:
       - bpmn-net
 

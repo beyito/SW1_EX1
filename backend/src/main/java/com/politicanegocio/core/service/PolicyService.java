@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.politicanegocio.core.model.Lane;
 import com.politicanegocio.core.model.Policy;
+import com.politicanegocio.core.model.PolicyInitialRequirement;
 import com.politicanegocio.core.model.TaskExecutionOrder;
 import com.politicanegocio.core.model.TaskOrder;
 import com.politicanegocio.core.model.User;
@@ -33,7 +34,7 @@ public class PolicyService {
         this.bpmnStartLaneParser = bpmnStartLaneParser;
     }
 
-   public Policy createPolicy(String name, String description) {
+   public Policy createPolicy(String name, String description, List<PolicyInitialRequirement> initialRequirements) {
         
         try {
             User currentUser = getCurrentUser();
@@ -46,6 +47,7 @@ public class PolicyService {
             policy.setCompanyId(currentUser.getCompany());
             policy.setCompanyName(currentUser.getParentCompany());
             policy.setCreatedBy(currentUser.getUsername());
+            policy.setInitialRequirements(sanitizeInitialRequirements(initialRequirements));
             policy.setCreatedAt(LocalDateTime.now());
             policy.setUpdatedAt(LocalDateTime.now());
 
@@ -106,18 +108,23 @@ public class PolicyService {
         }
         User currentUser = getCurrentUser();
         if (!Objects.equals(policy.getCompanyId(), currentUser.getCompany())) {
-            throw new RuntimeException("Acceso denegado a politicas de otra empresa");
+            throw new RuntimeException("Acceso denegado a políticas de otra empresa");
         }
         return policy;
     }
 
-    public Policy updatePolicyGraph(String policyId, String diagramJson, List<Lane> lanes) {
+    public Policy updatePolicyGraph(
+            String policyId,
+            String diagramJson,
+            List<Lane> lanes,
+            List<PolicyInitialRequirement> initialRequirements
+    ) {
         Policy policy = policyRepository.findById(policyId)
-                .orElseThrow(() -> new RuntimeException("Politica no encontrada con ID: " + policyId));
+                .orElseThrow(() -> new RuntimeException("Política no encontrada con ID: " + policyId));
 
         User currentUser = getCurrentUser();
         if (!Objects.equals(policy.getCompanyId(), currentUser.getCompany())) {
-            throw new RuntimeException("Acceso denegado a politicas de otra empresa");
+            throw new RuntimeException("Acceso denegado a políticas de otra empresa");
         }
 
         try {
@@ -137,6 +144,7 @@ public class PolicyService {
             policy.setDiagramJson(updatedDiagramJson);
             policy.setStartLaneId(normalizeLaneId(bpmnStartLaneParser.extractStartLaneId(updatedDiagramJson)));
             policy.setLanes(lanes == null ? List.of() : lanes);
+            policy.setInitialRequirements(sanitizeInitialRequirements(initialRequirements));
             policy.setUpdatedAt(LocalDateTime.now());
             return policyRepository.save(policy);
         } catch (Exception exception) {
@@ -146,11 +154,11 @@ public class PolicyService {
 
     public TaskExecutionOrder getTaskExecutionOrder(String policyId) {
         Policy policy = policyRepository.findById(policyId)
-                .orElseThrow(() -> new RuntimeException("Politica no encontrada con ID: " + policyId));
+                .orElseThrow(() -> new RuntimeException("Política no encontrada con ID: " + policyId));
 
         User currentUser = getCurrentUser();
         if (!Objects.equals(policy.getCompanyId(), currentUser.getCompany())) {
-            throw new RuntimeException("Acceso denegado a politicas de otra empresa");
+            throw new RuntimeException("Acceso denegado a políticas de otra empresa");
         }
 
         try {
@@ -337,5 +345,42 @@ public class PolicyService {
                 .map(Lane::getName)
                 .findFirst()
                 .orElse("Sin carril");
+    }
+
+    private List<PolicyInitialRequirement> sanitizeInitialRequirements(List<PolicyInitialRequirement> rawRequirements) {
+        if (rawRequirements == null || rawRequirements.isEmpty()) {
+            return List.of();
+        }
+
+        List<PolicyInitialRequirement> sanitized = new ArrayList<>();
+        for (PolicyInitialRequirement requirement : rawRequirements) {
+            if (requirement == null) {
+                continue;
+            }
+
+            String id = Objects.toString(requirement.getId(), "").trim();
+            String name = Objects.toString(requirement.getName(), "").trim();
+            if (id.isBlank() || name.isBlank()) {
+                continue;
+            }
+
+            PolicyInitialRequirement normalized = new PolicyInitialRequirement();
+            normalized.setId(id);
+            normalized.setName(name);
+            normalized.setDescription(Objects.toString(requirement.getDescription(), "").trim());
+            normalized.setRequired(requirement.isRequired());
+
+            List<String> extensions = requirement.getAllowedExtensions() == null ? List.of() : requirement.getAllowedExtensions();
+            normalized.setAllowedExtensions(
+                    extensions.stream()
+                            .filter(Objects::nonNull)
+                            .map(value -> value.replace(".", "").trim().toLowerCase(Locale.ROOT))
+                            .filter(value -> !value.isBlank())
+                            .distinct()
+                            .toList()
+            );
+            sanitized.add(normalized);
+        }
+        return sanitized;
     }
 }

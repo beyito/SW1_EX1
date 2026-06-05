@@ -16,7 +16,7 @@ export class PolicyMetricsService {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(error || 'No se pudieron cargar las metricas de la politica');
+      throw new Error(error || 'No se pudieron cargar las métricas de la política');
     }
 
     return response.json();

@@ -18,6 +18,7 @@ public class Policy {
     private String diagramJson; // Grafo serializado de JointJS o XML BPMN
     private String startLaneId;
     private List<Lane> lanes = new ArrayList<>();
+    private List<PolicyInitialRequirement> initialRequirements = new ArrayList<>();
     private String companyId;
     private String companyName;
     private String createdBy;

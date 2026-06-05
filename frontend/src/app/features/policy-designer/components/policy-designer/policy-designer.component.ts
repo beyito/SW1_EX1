@@ -1,14 +1,14 @@
-import { CommonModule, NgFor, NgIf } from '@angular/common';
+﻿import { CommonModule, NgFor, NgIf } from '@angular/common';
 import { AfterViewInit, Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild, inject, ChangeDetectorRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-// 🚩 IMPORTANTE: Importamos linkTools, elementTools y ui
+//  IMPORTANTE: Importamos linkTools, elementTools y ui
 import { dia, shapes, linkTools, elementTools, ui } from '@joint/plus'; 
 import { StompSubscription } from '@stomp/stompjs';
 import { DiagramCanvasService } from '../../services/diagram-canvas.service';
 import { DiagramStorageService } from '../../services/diagram-storage.service';
 import { PolicyDataService } from '../../services/policy-data.service';
 import { WebSocketService } from '../../services/web-socket.service';
-import { CompanyArea, Lane, PolicyPayload, FormField, TaskExecutionOrder, LinkCondition, LinkConditionUpdate } from '../../models/policy-designer.models';
+import { CompanyArea, Lane, PolicyInitialRequirement, PolicyPayload, FormField, TaskExecutionOrder, LinkCondition, LinkConditionUpdate } from '../../models/policy-designer.models';
 import { DiagramEvent } from '../../models/diagram-event.model';
 import { NODE_TEMPLATES } from '../../utils/policy-designer.constants';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
@@ -52,7 +52,7 @@ export class PolicyDesignerComponent implements OnInit, AfterViewInit, OnDestroy
   private isRemoteChange = false;
   private readonly clientId = crypto.randomUUID();
   
-  // 🚩 Variable para controlar el recuadro de redimensionamiento
+  //  Variable para controlar el recuadro de redimensionamiento
   private freeTransform: any = null;
   private resizeObserver: ResizeObserver | null = null;
   private laneGeometrySyncTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -70,7 +70,7 @@ export class PolicyDesignerComponent implements OnInit, AfterViewInit, OnDestroy
   public readonly nodeTemplates = NODE_TEMPLATES;
   public policyName = '';
   public selectedPolicyId: string | null = null;
-  public infoMessage = 'Cargando politica...';
+  public infoMessage = 'Cargando política...';
   public selectedSourceId: dia.Cell.ID | null = null;
   public selectedTargetId: dia.Cell.ID | null = null;
   public isConnectionMode = false;
@@ -100,6 +100,11 @@ export class PolicyDesignerComponent implements OnInit, AfterViewInit, OnDestroy
   public isRenaming = false;
   public taskExecutionOrder: TaskExecutionOrder | null = null;
   public showTaskOrder = false;
+  public initialRequirements: PolicyInitialRequirement[] = [];
+  public newRequirementName = '';
+  public newRequirementDescription = '';
+  public newRequirementRequired = true;
+  public newRequirementExtensions = 'pdf';
   public copilotLoading = false;
   public copilotMessages: CopilotChatMessage[] = [];
   public copilotConversationId: string | null = null;
@@ -258,7 +263,7 @@ export class PolicyDesignerComponent implements OnInit, AfterViewInit, OnDestroy
       cellView: elementView,
       allowRotation: false,
       
-      // 🚩 CAMBIO CLAVE: Permite agrandar horizontal y verticalmente por separado
+      //  CAMBIO CLAVE: Permite agrandar horizontal y verticalmente por separado
       preserveAspectRatio: false, 
       
       // Opcional: Define un tamaño mínimo para que el nodo no desaparezca al achicarlo
@@ -276,10 +281,10 @@ export class PolicyDesignerComponent implements OnInit, AfterViewInit, OnDestroy
 private showLinkTools(linkView: dia.LinkView): void {
     this.clearTools();
 
-    // 🚩 1. El vector matemático que dibuja un círculo perfecto
+    //  1. El vector matemático que dibuja un círculo perfecto
     const circlePath = 'M -7 0 a 7 7 0 1 0 14 0 a 7 7 0 1 0 -14 0';
 
-    // 🚩 2. EXTENDEMOS la clase de ORIGEN para obligar a JointJS a usar nuestro diseño
+    //  2. EXTENDEMOS la clase de ORIGEN para obligar a JointJS a usar nuestro diseño
     const CustomSourceArrowhead = linkTools.SourceArrowhead.extend({
       options: {
         markup: [{
@@ -296,7 +301,7 @@ private showLinkTools(linkView: dia.LinkView): void {
       }
     });
 
-    // 🚩 3. EXTENDEMOS la clase de DESTINO
+    //  3. EXTENDEMOS la clase de DESTINO
     const CustomTargetArrowhead = linkTools.TargetArrowhead.extend({
       options: {
         markup: [{
@@ -319,7 +324,7 @@ private showLinkTools(linkView: dia.LinkView): void {
         new linkTools.Vertices(),
         new linkTools.Segments(),
         
-        // 🚩 Usamos las nuevas clases extendidas
+        //  Usamos las nuevas clases extendidas
         new CustomSourceArrowhead(),
         new CustomTargetArrowhead(),
         
@@ -360,7 +365,7 @@ private showLinkTools(linkView: dia.LinkView): void {
         this.createConnectionFromSelection();
       } 
       else {
-        // 🚩 MODO NORMAL: Permitimos seleccionar TODO (Nodos y Calles)
+        //  MODO NORMAL: Permitimos seleccionar TODO (Nodos y Calles)
         this.selectedSourceId = clickedId;
         this.selectedTargetId = null;
         this.selectElement(clickedId, 'node');
@@ -386,7 +391,7 @@ private showLinkTools(linkView: dia.LinkView): void {
 
     this.paper.on('element:pointerdown', (cellView: any) => {
       const element = cellView.model;
-    // // 🚩 SOLO traemos al frente si NO es una calle
+    // //  SOLO traemos al frente si NO es una calle
       if (!element.get('isLaneBackground')) {
         element.toFront(); 
       } else {
@@ -533,7 +538,7 @@ private showLinkTools(linkView: dia.LinkView): void {
       this.webSocketService.sendMessage(this.selectedPolicyId, event);
     });
     
-    // 🚩 LIMPIEZA DE ESTADO: Si borras con la 'X' roja, Angular limpia el sidebar
+    //  LIMPIEZA DE ESTADO: Si borras con la 'X' roja, Angular limpia el sidebar
     this.graph.on('remove', (cell: dia.Cell) => {
       if (this.selectedElementId === cell.id) {
         this.selectedElementId = null;
@@ -565,7 +570,7 @@ private showLinkTools(linkView: dia.LinkView): void {
   // ==========================================
 
   public deleteElement(): void {
-    this.clearTools(); // 🚩 Ocultamos el recuadro visual antes de eliminar de memoria
+    this.clearTools(); //  Ocultamos el recuadro visual antes de eliminar de memoria
     if (!this.selectedElementId) {
       this.infoMessage = 'No hay elemento seleccionado para eliminar.';
       return;
@@ -807,7 +812,7 @@ private showLinkTools(linkView: dia.LinkView): void {
 
     this.selectedSourceId = null;
     this.selectedTargetId = null;
-    this.infoMessage = 'Modo conexion activado. Selecciona el nodo origen y luego el nodo destino.';
+    this.infoMessage = 'Modo conexión activado. Selecciona el nodo origen y luego el nodo destino.';
   }
 
   public clearSelection(): void {
@@ -990,7 +995,7 @@ private showLinkTools(linkView: dia.LinkView): void {
 
   public async getTaskExecutionOrder(): Promise<void> {
     if (!this.selectedPolicyId) {
-      this.infoMessage = 'Selecciona una politica antes de ver el orden de tareas.';
+      this.infoMessage = 'Selecciona una política antes de ver el orden de tareas.';
       return;
     }
 
@@ -1028,7 +1033,7 @@ private showLinkTools(linkView: dia.LinkView): void {
 
   public cancelEditField(): void {
     this.resetNewFieldForm();
-    this.infoMessage = 'Edición de pregunta cancelada.';
+        this.infoMessage = 'Edición de pregunta cancelada.';
   }
 
   public onSelectedLinkConditionChange(update: LinkConditionUpdate): void {
@@ -1075,7 +1080,7 @@ private showLinkTools(linkView: dia.LinkView): void {
 
   private async loadPolicyFromRoute(policyId: string | null): Promise<void> {
     if (!policyId) {
-      this.infoMessage = 'No se encontro el id de la politica en la URL.';
+      this.infoMessage = 'No se encontró el id de la política en la URL.';
       return;
     }
 
@@ -1087,7 +1092,7 @@ private showLinkTools(linkView: dia.LinkView): void {
       const policy = await this.policyDataService.getPolicyById(policyId);
 
       if (!policy) {
-        this.infoMessage = `Politica no encontrada para el id ${policyId}.`;
+        this.infoMessage = `Política no encontrada para el id ${policyId}.`;
         return;
       }
 
@@ -1095,10 +1100,10 @@ private showLinkTools(linkView: dia.LinkView): void {
       this.applyPolicy(policy);
       await this.loadCopilotHistory(policyId);
       await this.connectToPolicyTopic(policyId);
-      this.infoMessage = `Editando politica: ${policy.name}`;
+      this.infoMessage = `Editando política: ${policy.name}`;
       this.cdr.detectChanges();
     } catch (error) {
-      this.infoMessage = `Error cargando politica: ${error}`;
+      this.infoMessage = `Error cargando política: ${error}`;
       this.cdr.detectChanges();
     }
   }
@@ -1147,7 +1152,7 @@ private showLinkTools(linkView: dia.LinkView): void {
         this.handleRemoteEvent(event);
       });
     } catch (error) {
-      this.infoMessage = `Conexion en tiempo real no disponible: ${error}`;
+      this.infoMessage = `Conexión en tiempo real no disponible: ${error}`;
     }
   }
 
@@ -1293,10 +1298,11 @@ private showLinkTools(linkView: dia.LinkView): void {
 
     const fullPolicy: PolicyPayload = {
       id: this.selectedPolicyId ?? '',
-      name: this.policyName || 'Politica',
+      name: this.policyName || 'Política',
       description: '',
       diagramJson: JSON.stringify(payloadDiagram),
-      lanes: incomingLanes
+      lanes: incomingLanes,
+      initialRequirements: this.initialRequirements
     };
 
     this.isRemoteChange = true;
@@ -1324,7 +1330,7 @@ private showLinkTools(linkView: dia.LinkView): void {
     const source = this.graph.getCell(this.selectedSourceId) as dia.Element;
     const target = this.graph.getCell(this.selectedTargetId) as dia.Element;
     if (!source || !target) {
-      this.infoMessage = 'No se encontro uno de los nodos en el modelo.';
+      this.infoMessage = 'No se encontró uno de los nodos en el modelo.';
       return;
     }
 
@@ -1338,7 +1344,7 @@ private showLinkTools(linkView: dia.LinkView): void {
     let conditionLabel: string | undefined;
     if (source.get('nodeType') === 'DECISION') {
       const outboundLinks = this.graph.getLinks().filter((link) => link.get('source')?.id === source.id).length;
-      conditionLabel = outboundLinks === 0 ? 'Sí' : outboundLinks === 1 ? 'No' : undefined;
+            conditionLabel = outboundLinks === 0 ? 'Sí' : outboundLinks === 1 ? 'No' : undefined;
     }
 
     const link = this.diagramCanvasService.createLink(source, target, conditionLabel);
@@ -1355,6 +1361,7 @@ private showLinkTools(linkView: dia.LinkView): void {
       this.selectedSourceId = null;
       this.selectedTargetId = null;
       this.isConnectionMode = false;
+      this.initialRequirements = this.normalizeInitialRequirements(policy.initialRequirements);
       const normalizedLanes = this.normalizeLanesFromAreas(policy.lanes ?? []);
       const hasGeometry = this.hasPersistedLaneGeometry(normalizedLanes);
       this.lanes = hasGeometry
@@ -1540,8 +1547,8 @@ private showLinkTools(linkView: dia.LinkView): void {
     this.autoSaveInFlight = true;
     try {
       const graphJson = JSON.stringify(this.diagramCanvasService.getPersistedGraphJSON(this.graph));
-      await this.policyDataService.updatePolicyDiagram(this.selectedPolicyId, graphJson, this.lanes);
-      this.infoMessage = 'Cambios guardados automaticamente.';
+      await this.policyDataService.updatePolicyDiagram(this.selectedPolicyId, graphJson, this.lanes, this.initialRequirements);
+      this.infoMessage = 'Cambios guardados automáticamente.';
     } catch (error) {
       this.infoMessage = `Error en guardado automatico: ${error}`;
     } finally {
@@ -1555,6 +1562,37 @@ private showLinkTools(linkView: dia.LinkView): void {
 
   public trackByFieldId(index: number, field: FormField): string {
     return field.id;
+  }
+  public trackByRequirementId(index: number, requirement: PolicyInitialRequirement): string {
+    return requirement.id;
+  }
+
+  public addInitialRequirement(): void {
+    const name = (this.newRequirementName ?? '').trim();
+    if (!name) {
+      this.infoMessage = 'El requisito inicial necesita un nombre.';
+      return;
+    }
+
+    const requirement: PolicyInitialRequirement = {
+      id: crypto.randomUUID(),
+      name,
+      description: (this.newRequirementDescription ?? '').trim(),
+      required: this.newRequirementRequired,
+      allowedExtensions: this.parseAllowedExtensions(this.newRequirementExtensions)
+    };
+
+    this.initialRequirements = [...this.initialRequirements, requirement];
+    this.newRequirementName = '';
+    this.newRequirementDescription = '';
+    this.newRequirementRequired = true;
+    this.newRequirementExtensions = 'pdf';
+    this.scheduleAutoSave();
+  }
+
+  public removeInitialRequirement(requirementId: string): void {
+    this.initialRequirements = this.initialRequirements.filter((requirement) => requirement.id !== requirementId);
+    this.scheduleAutoSave();
   }
 
   public async onCopilotMessageSubmitted(userText: string): Promise<void> {
@@ -1659,10 +1697,11 @@ private showLinkTools(linkView: dia.LinkView): void {
 
         const updatedPolicy: PolicyPayload = {
           id: this.selectedPolicyId ?? '',
-          name: this.policyName || 'Politica',
+          name: this.policyName || 'Política',
           description: '',
           diagramJson: JSON.stringify(resolvedDiagram),
-          lanes: this.lanes // ¡AHORA SÍ GUARDA LOS CARRILES NUEVOS DE LA IA!
+          lanes: this.lanes,// ¡AHORA SÍ GUARDA LOS CARRILES NUEVOS DE LA IA!
+          initialRequirements: this.initialRequirements 
         };
         
         this.applyPolicy(updatedPolicy);
@@ -1671,7 +1710,8 @@ private showLinkTools(linkView: dia.LinkView): void {
           await this.policyDataService.updatePolicyDiagram(
             this.selectedPolicyId,
             JSON.stringify(resolvedDiagram),
-            this.lanes
+            this.lanes,
+            this.initialRequirements
           );
         }
         
@@ -1732,9 +1772,33 @@ private showLinkTools(linkView: dia.LinkView): void {
     }
   }
 
+  private normalizeInitialRequirements(source?: PolicyInitialRequirement[]): PolicyInitialRequirement[] {
+    if (!Array.isArray(source)) {
+      return [];
+    }
+
+    return source
+      .filter((requirement) => !!requirement && !!requirement.name)
+      .map((requirement) => ({
+        id: (requirement.id ?? crypto.randomUUID()).trim(),
+        name: (requirement.name ?? '').trim(),
+        description: (requirement.description ?? '').trim(),
+        required: requirement.required !== false,
+        allowedExtensions: this.parseAllowedExtensions((requirement.allowedExtensions ?? []).join(','))
+      }))
+      .filter((requirement) => !!requirement.id && !!requirement.name);
+  }
+
+  private parseAllowedExtensions(raw: string): string[] {
+    return (raw ?? '')
+      .split(',')
+      .map((value) => value.replace('.', '').trim().toLowerCase())
+      .filter((value) => !!value);
+  }
+
   private isMutationIntent(text: string): boolean {
     const normalized = text.toLowerCase();
-    return /(agrega|añade|anade|crea|modifica|cambia|elimina|borra|conecta|desconecta|mueve|renombra|actualiza)/.test(normalized);
+        return /(agrega|añade|anade|crea|modifica|cambia|elimina|borra|conecta|desconecta|mueve|renombra|actualiza)/.test(normalized);
   }
 
   private applyLaneCommandsFromText(text: string): void {
@@ -1750,7 +1814,7 @@ private showLinkTools(linkView: dia.LinkView): void {
     let changed = false;
     for (const [areaName, area] of areasByName.entries()) {
       const escapedAreaName = this.escapeRegExp(areaName);
-      const addPattern = new RegExp(`(agrega|a(?:ñ|n)ade|crea)\\s+(el\\s+|un\\s+)?carril\\s+(${escapedAreaName})`, 'i');
+            const addPattern = new RegExp(`(agrega|a(?:ñ|n)ade|crea)\\s+(el\\s+|un\\s+)?carril\\s+(${escapedAreaName})`, 'i');
       const removePattern = new RegExp(`(elimina|borra|quita|remueve)\\s+(el\\s+|un\\s+)?carril\\s+(${escapedAreaName})`, 'i');
 
       if (addPattern.test(normalizedText) && !this.lanes.some((lane) => lane.id === area.name)) {
@@ -1841,3 +1905,4 @@ private showLinkTools(linkView: dia.LinkView): void {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 }
+

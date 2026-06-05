@@ -6,6 +6,7 @@ import '../../tasks/screens/pending_tasks_screen.dart';
 import '../../tasks/services/task_service.dart';
 import '../data/dashboard_service.dart';
 import '../models/startable_policy.dart';
+import 'start_process_requirements_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final AuthService authService;
@@ -25,7 +26,6 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   late Future<List<StartablePolicy>> _policiesFuture;
-  final Set<String> _startingPolicyIds = <String>{};
 
   @override
   void initState() {
@@ -59,32 +59,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _startPolicy(StartablePolicy policy) async {
     if (policy.id.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('La politica no tiene un identificador valido.')),
+        const SnackBar(content: Text('La política no tiene un identificador válido.')),
       );
       return;
     }
 
-    setState(() {
-      _startingPolicyIds.add(policy.id);
-    });
+    final started = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => StartProcessRequirementsScreen(
+          policy: policy,
+          dashboardService: widget.dashboardService,
+          taskService: widget.taskService,
+        ),
+      ),
+    );
 
-    try {
-      final processMetadata = await _askForProcessMetadata(policy);
-      if (processMetadata == null) {
-        return;
-      }
-
-      await widget.dashboardService.startProcess(
-        policy.id,
-        title: processMetadata.title,
-        description: processMetadata.description,
-      );
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Tramite iniciado: ${policy.name}')),
-      );
-
+    if (started == true && mounted) {
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => PendingTasksScreen(
@@ -93,88 +83,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
       );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error.toString().replaceFirst('Exception: ', '')),
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _startingPolicyIds.remove(policy.id);
-        });
-      }
     }
-  }
-
-  Future<_ProcessMetadata?> _askForProcessMetadata(StartablePolicy policy) async {
-    final titleController = TextEditingController(text: policy.name);
-    final descriptionController = TextEditingController();
-
-    final result = await showDialog<_ProcessMetadata>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Nueva instancia'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: titleController,
-                maxLength: 120,
-                decoration: const InputDecoration(
-                  labelText: 'Titulo',
-                  hintText: 'Ej. Solicitud de compra abril',
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: descriptionController,
-                maxLines: 3,
-                maxLength: 300,
-                decoration: const InputDecoration(
-                  labelText: 'Descripcion',
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () {
-                final title = titleController.text.trim();
-                if (title.isEmpty) {
-                  return;
-                }
-                Navigator.of(dialogContext).pop(
-                  _ProcessMetadata(
-                    title: title,
-                    description: descriptionController.text.trim(),
-                  ),
-                );
-              },
-              child: const Text('Iniciar'),
-            ),
-          ],
-        );
-      },
-    );
-
-    titleController.dispose();
-    descriptionController.dispose();
-    return result;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Tramites Disponibles'),
+        title: const Text('Trámites Disponibles'),
         actions: [
           IconButton(
             onPressed: _openPendingTasks,
@@ -210,7 +126,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           final policies = snapshot.data ?? const [];
           if (policies.isEmpty) {
             return const Center(
-              child: Text('No hay tramites disponibles para iniciar.'),
+              child: Text('No hay trámites disponibles para iniciar.'),
             );
           }
 
@@ -227,7 +143,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               itemCount: policies.length,
               itemBuilder: (context, index) {
                 final policy = policies[index];
-                final isStarting = _startingPolicyIds.contains(policy.id);
                 return Card(
                   margin: const EdgeInsets.symmetric(vertical: 8),
                   shape: RoundedRectangleBorder(
@@ -267,22 +182,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                policy.description.isEmpty ? 'Sin descripcion' : policy.description,
+                                policy.description.isEmpty ? 'Sin descripción' : policy.description,
                                 style: Theme.of(context).textTheme.bodyMedium,
                               ),
+                              if (policy.initialRequirements.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  '${policy.initialRequirements.length} requisitos iniciales',
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.primary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
                               const SizedBox(height: 10),
                               Align(
                                 alignment: Alignment.centerRight,
                                 child: FilledButton.icon(
-                                  onPressed: isStarting ? null : () => _startPolicy(policy),
-                                  icon: isStarting
-                                      ? const SizedBox(
-                                          width: 16,
-                                          height: 16,
-                                          child: CircularProgressIndicator(strokeWidth: 2),
-                                        )
-                                      : const Icon(Icons.play_arrow_rounded),
-                                  label: Text(isStarting ? 'Iniciando...' : 'Iniciar'),
+                                  onPressed: () => _startPolicy(policy),
+                                  icon: const Icon(Icons.play_arrow_rounded),
+                                  label: const Text('Iniciar'),
                                 ),
                               )
                             ],
@@ -299,14 +218,4 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     );
   }
-}
-
-class _ProcessMetadata {
-  final String title;
-  final String description;
-
-  const _ProcessMetadata({
-    required this.title,
-    required this.description,
-  });
 }

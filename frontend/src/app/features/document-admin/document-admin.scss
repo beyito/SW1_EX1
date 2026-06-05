@@ -1,0 +1,168 @@
+.dms-admin-page {
+  display: grid;
+  gap: 18px;
+}
+
+.dms-hero {
+  padding: 26px;
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at top right, rgba(14, 165, 233, 0.22), transparent 24rem),
+    linear-gradient(135deg, #0f172a, #1d4ed8);
+  color: #ffffff;
+  box-shadow: 0 22px 70px rgba(15, 23, 42, 0.22);
+}
+
+.dms-hero.audit {
+  background:
+    radial-gradient(circle at top right, rgba(250, 204, 21, 0.20), transparent 24rem),
+    linear-gradient(135deg, #111827, #92400e);
+}
+
+.dms-hero p {
+  margin: 0 0 8px;
+  opacity: 0.78;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.dms-hero h2 {
+  margin: 0;
+  font-size: clamp(28px, 4vw, 44px);
+}
+
+.dms-hero span {
+  display: block;
+  margin-top: 8px;
+  opacity: 0.82;
+}
+
+.control-card,
+.table-card {
+  border: 1px solid #dbe3ef;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
+}
+
+.control-card {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px;
+}
+
+.control-card label {
+  display: grid;
+  flex: 1;
+  gap: 8px;
+  color: #475569;
+  font-weight: 700;
+}
+
+.control-card select {
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.control-card button,
+.table-card button {
+  min-height: 38px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: #2563eb;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.control-card button:disabled,
+.table-card button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.document-summary {
+  display: grid;
+  gap: 4px;
+  min-width: 260px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #eff6ff;
+  color: #1e3a8a;
+}
+
+.document-summary span {
+  font-size: 12px;
+}
+
+.table-card {
+  overflow: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 13px 14px;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+}
+
+th {
+  background: #f8fafc;
+  color: #475569;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+td {
+  color: #172033;
+}
+
+input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  accent-color: #2563eb;
+}
+
+.pill {
+  display: inline-flex;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.pill.delete {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.message {
+  margin: 0;
+  color: #334155;
+}
+
+@media (max-width: 780px) {
+  .control-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .document-summary {
+    min-width: 0;
+  }
+}

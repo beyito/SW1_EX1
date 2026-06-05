@@ -112,7 +112,7 @@ public class CopilotService {
             if (aiResponse == null) {
                 throw new ResponseStatusException(
                         HttpStatus.BAD_GATEWAY,
-                        "El microservicio IA devolvio respuesta vacia. requestId=" + requestId
+                        "El microservicio IA devolvió respuesta vacía. requestId=" + requestId
                 );
             }
 
@@ -240,7 +240,7 @@ public class CopilotService {
             if (aiRawResponse == null || aiRawResponse.trim().isEmpty()) {
                 throw new ResponseStatusException(
                         HttpStatus.BAD_GATEWAY,
-                        "El microservicio IA devolvio respuesta vacia (voice-fill). requestId=" + requestId
+                        "El microservicio IA devolvió respuesta vacía (voice-fill). requestId=" + requestId
                 );
             }
 
@@ -449,7 +449,7 @@ public class CopilotService {
         if (payload.isEmpty()) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_GATEWAY,
-                    "El microservicio IA devolvio respuesta vacia. requestId=" + requestId
+                    "El microservicio IA devolvió respuesta vacía. requestId=" + requestId
             );
         }
         try {
@@ -458,7 +458,7 @@ public class CopilotService {
             String preview = payload.length() > 1000 ? payload.substring(0, 1000) + "..." : payload;
             throw new ResponseStatusException(
                     HttpStatus.BAD_GATEWAY,
-                    "Respuesta invalida del microservicio IA (chat). requestId=" + requestId + " body=" + preview,
+                    "Respuesta inválida del microservicio IA (chat). requestId=" + requestId + " body=" + preview,
                     exception
             );
         }
@@ -469,7 +469,7 @@ public class CopilotService {
         if (payload.isEmpty()) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_GATEWAY,
-                    "El microservicio IA no devolvio respuesta (apply). requestId=" + requestId
+                    "El microservicio IA no devolvió respuesta (apply). requestId=" + requestId
             );
         }
         try {
@@ -478,7 +478,7 @@ public class CopilotService {
             String preview = payload.length() > 1000 ? payload.substring(0, 1000) + "..." : payload;
             throw new ResponseStatusException(
                     HttpStatus.BAD_GATEWAY,
-                    "Respuesta invalida del microservicio IA (apply). requestId=" + requestId + " body=" + preview,
+                    "Respuesta inválida del microservicio IA (apply). requestId=" + requestId + " body=" + preview,
                     exception
             );
         }
@@ -491,13 +491,13 @@ public class CopilotService {
     }
 
     private ResponseStatusException timeoutAiException(String operation, String requestId, Exception cause) {
-        String message = "El servicio de IA esta saturado o demoro demasiado en responder. Intente nuevamente. "
+        String message = "El servicio de IA está saturado o demoró demasiado en responder. Intente nuevamente. "
                 + "(operacion=" + operation + ", requestId=" + requestId + ")";
         return new ResponseStatusException(HttpStatus.GATEWAY_TIMEOUT, message, cause);
     }
 
     private ResponseStatusException badGatewayAiException(String operation, String requestId, Exception cause) {
-        String message = "El servicio de IA devolvio una respuesta no valida. Intente nuevamente. "
+        String message = "El servicio de IA devolvió una respuesta no válida. Intente nuevamente. "
                 + "(operacion=" + operation + ", requestId=" + requestId + ")";
         return new ResponseStatusException(HttpStatus.BAD_GATEWAY, message, cause);
     }

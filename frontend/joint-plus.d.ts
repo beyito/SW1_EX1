@@ -1,4 +1,4 @@
-/*! JointJS+ v4.2.3 (2026-04-12) - HTML5 Diagramming Framework - TRIAL VERSION
+/*! JointJS+ v4.2.3 (2026-06-01) - HTML5 Diagramming Framework - TRIAL VERSION
 
 Copyright (c) 2026 client IO
 

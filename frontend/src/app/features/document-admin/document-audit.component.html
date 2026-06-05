@@ -1,0 +1,55 @@
+<section class="dms-admin-page">
+  <header class="dms-hero audit">
+    <p>Trazabilidad DMS</p>
+    <h2>Auditoria documental</h2>
+    <span>Consulta quién vio, editó o eliminó documentos dentro de la empresa.</span>
+  </header>
+
+  <section class="control-card">
+    <label>
+      Documento
+      <select [(ngModel)]="selectedDocumentId" (change)="loadAudit()">
+        <option value="ALL">Todos los documentos</option>
+        @for (document of documents; track document.id) {
+          <option [value]="document.id">{{ document.fileName }}</option>
+        }
+      </select>
+    </label>
+    <button type="button" (click)="loadAudit()" [disabled]="loading">
+      {{ loading ? 'Actualizando...' : 'Actualizar' }}
+    </button>
+  </section>
+
+  <section class="table-card">
+    <table>
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Usuario</th>
+          <th>Acción</th>
+          <th>Documento</th>
+          <th>Ruta</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (log of logs; track log.id) {
+          <tr>
+            <td>{{ log.timestamp | date:'short' }}</td>
+            <td>{{ log.username || 'Sistema' }}</td>
+            <td><span class="pill" [class.delete]="log.action === 'DELETE'">{{ log.action }}</span></td>
+            <td>{{ documentName(log.documentId) }}</td>
+            <td>{{ log.httpMethod }} {{ log.path }}</td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="5">No hay registros de auditoría para el filtro seleccionado.</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </section>
+
+  @if (message) {
+    <p class="message">{{ message }}</p>
+  }
+</section>

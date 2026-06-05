@@ -3,6 +3,7 @@ package com.politicanegocio.core.dto;
 public class UploadResponseDto {
 
     private String key;
+    private String documentId;
     private String url;
     private String contentType;
     private long size;
@@ -17,12 +18,28 @@ public class UploadResponseDto {
         this.size = size;
     }
 
+    public UploadResponseDto(String key, String documentId, String url, String contentType, long size) {
+        this.key = key;
+        this.documentId = documentId;
+        this.url = url;
+        this.contentType = contentType;
+        this.size = size;
+    }
+
     public String getKey() {
         return key;
     }
 
     public void setKey(String key) {
         this.key = key;
+    }
+
+    public String getDocumentId() {
+        return documentId;
+    }
+
+    public void setDocumentId(String documentId) {
+        this.documentId = documentId;
     }
 
     public String getUrl() {

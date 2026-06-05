@@ -80,7 +80,7 @@ export class FuncionariosComponent implements OnInit {
     try {
       const response = await fetch('/api/admin/areas', { headers: this.authHeaders });
       if (!response.ok) {
-        throw new Error('No se pudieron cargar las areas');
+        throw new Error('No se pudieron cargar las áreas');
       }
       this.areas = await response.json();
       if (!this.funcArea || !this.selectableAreas.some((area) => area.name === this.funcArea)) {
@@ -88,7 +88,7 @@ export class FuncionariosComponent implements OnInit {
       }
       this.cdr.detectChanges(); // 🚩
     } catch (error) {
-      this.areaMessage = error instanceof Error ? error.message : 'Error al cargar areas';
+      this.areaMessage = error instanceof Error ? error.message : 'Error al cargar áreas';
       this.cdr.detectChanges(); // 🚩
     }
   }
@@ -134,17 +134,17 @@ export class FuncionariosComponent implements OnInit {
       });
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(errorText || 'No se pudo crear el area');
+        throw new Error(errorText || 'No se pudo crear el área');
       }
       const createdArea = (await response.json()) as AreaInfo;
       this.areas = [...this.areas, createdArea];
       this.newAreaName = '';
-      this.areaMessage = 'Area creada correctamente';
+      this.areaMessage = 'Área creada correctamente';
       if (!this.funcArea && createdArea.name.toLowerCase() !== 'cliente') {
         this.funcArea = createdArea.name;
       }
     } catch (error) {
-      this.areaMessage = error instanceof Error ? error.message : 'Error al crear area';
+      this.areaMessage = error instanceof Error ? error.message : 'Error al crear área';
     } finally {
       this.areaLoading = false;
       this.cdr.detectChanges(); // 🚩
@@ -176,15 +176,15 @@ export class FuncionariosComponent implements OnInit {
       });
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(errorText || 'No se pudo actualizar el area');
+        throw new Error(errorText || 'No se pudo actualizar el área');
       }
       const updatedArea = (await response.json()) as AreaInfo;
       this.areas = this.areas.map((area) => (area.id === areaId ? updatedArea : area));
-      this.areaMessage = 'Area actualizada correctamente';
+      this.areaMessage = 'Área actualizada correctamente';
       this.cancelEditArea();
       await this.loadFunctionaries();
     } catch (error) {
-      this.areaMessage = error instanceof Error ? error.message : 'Error al actualizar area';
+      this.areaMessage = error instanceof Error ? error.message : 'Error al actualizar área';
     } finally {
       this.areaLoading = false;
       this.cdr.detectChanges(); // 🚩
@@ -203,15 +203,15 @@ export class FuncionariosComponent implements OnInit {
       });
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(errorText || 'No se pudo eliminar el area');
+        throw new Error(errorText || 'No se pudo eliminar el área');
       }
       this.areas = this.areas.filter((area) => area.id !== areaId);
-      this.areaMessage = 'Area eliminada correctamente';
+      this.areaMessage = 'Área eliminada correctamente';
       if (!this.selectableAreas.some((area) => area.name === this.funcArea)) {
         this.funcArea = this.selectableAreas[0]?.name ?? '';
       }
     } catch (error) {
-      this.areaMessage = error instanceof Error ? error.message : 'Error al eliminar area';
+      this.areaMessage = error instanceof Error ? error.message : 'Error al eliminar área';
     } finally {
       this.areaLoading = false;
       this.cdr.detectChanges(); // 🚩

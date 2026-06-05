@@ -10,7 +10,15 @@ type Policy {
     updatedAt: String
     diagramJson: String!
     lanes: [Lane!]
-    
+    initialRequirements: [PolicyInitialRequirement!]
+}
+
+type PolicyInitialRequirement {
+    id: ID!
+    name: String!
+    description: String
+    required: Boolean!
+    allowedExtensions: [String!]
 }
 
 type Lane {
@@ -29,6 +37,14 @@ input LaneInput {
     x: Float
     width: Float
     height: Float
+}
+
+input PolicyInitialRequirementInput {
+    id: ID!
+    name: String!
+    description: String
+    required: Boolean!
+    allowedExtensions: [String!]
 }
 
 # ==========================================
@@ -89,8 +105,8 @@ type TaskDetail {
 # 3. MUTATIONS
 # ==========================================
 type Mutation {
-    createPolicy(name: String!, description: String): Policy
-    updatePolicyGraph(policyId: ID!, diagramJson: String!, lanes: [LaneInput!]): Policy
+    createPolicy(name: String!, description: String, initialRequirements: [PolicyInitialRequirementInput!]): Policy
+    updatePolicyGraph(policyId: ID!, diagramJson: String!, lanes: [LaneInput!], initialRequirements: [PolicyInitialRequirementInput!]): Policy
     takeTask(taskId: ID!): TaskDetail
     completeTask(taskId: ID!, formData: String!): TaskDetail
 }

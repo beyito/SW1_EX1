@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class TaskDetailDto {
     private String id;
+    private String processInstanceId;
     private String policyId;
     private String taskId;
     private String taskName;

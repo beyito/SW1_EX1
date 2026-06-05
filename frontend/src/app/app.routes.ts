@@ -5,10 +5,13 @@ import { AdminLayoutComponent } from './features/admin-layout/admin-layout.compo
 import { FuncionariosComponent } from './features/funcionarios/funcionarios.component';
 import { PolicyManagerComponent } from './features/policy-manager/policy-manager.component';
 import { PolicyMetricsComponent } from './features/policy-manager/policy-metrics/policy-metrics.component';
+import { DocumentPrivilegesComponent } from './features/document-admin/document-privileges.component';
+import { DocumentAuditComponent } from './features/document-admin/document-audit.component';
 import { PolicyDesignerComponent } from './features/policy-designer/components/policy-designer/policy-designer.component';
 import { TaskInboxComponent } from './features/execution/components/task-inbox/task-inbox.component';
 import { FuncionarioDashboardComponent } from './features/execution/components/funcionario-dashboard/funcionario-dashboard.component';
 import { TaskExecutionComponent } from './features/execution/components/task-execution/task-execution.component';
+import { DocumentViewerComponent } from './features/execution/components/document-viewer/document-viewer.component';
 import { roleGuard } from './role.guard';
 
 export const routes: Routes = [
@@ -29,6 +32,8 @@ export const routes: Routes = [
       { path: 'funcionarios', component: FuncionariosComponent },
       { path: 'policies', component: PolicyManagerComponent },
       { path: 'policies/:policyId/metrics', component: PolicyMetricsComponent },
+      { path: 'document-privileges', component: DocumentPrivilegesComponent },
+      { path: 'document-audit', component: DocumentAuditComponent },
       { path: '', redirectTo: 'funcionarios', pathMatch: 'full' }
     ]
   },
@@ -53,6 +58,12 @@ export const routes: Routes = [
     path: 'execution/task/:id',
     component: TaskExecutionComponent,
     canActivate: [roleGuard(['FUNCTIONARY', 'FUNCIONARIO', 'COMPANY_ADMIN'])]
+  },
+
+  {
+    path: 'documents/:id',
+    component: DocumentViewerComponent,
+    canActivate: [roleGuard(['FUNCTIONARY', 'FUNCIONARIO', 'COMPANY_ADMIN', 'CLIENT'])]
   },
 
   {

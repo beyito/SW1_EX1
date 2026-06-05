@@ -5,6 +5,7 @@ import { AuthService } from '../../../auth.service';
 
 export interface UploadedFile {
   key: string;
+  documentId?: string;
   url: string;
   contentType: string;
   size: number;
@@ -30,4 +31,3 @@ export class FileService {
     );
   }
 }
-

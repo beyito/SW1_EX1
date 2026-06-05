@@ -73,11 +73,11 @@ public class ProcessExecutionService {
 
     public ProcessInstance startProcess(String policyId, String title, String description, User user) {
         Policy policy = policyRepository.findById(policyId)
-                .orElseThrow(() -> new RuntimeException("Politica no encontrada con ID: " + policyId));
+                .orElseThrow(() -> new RuntimeException("Política no encontrada con ID: " + policyId));
 
         boolean canStart = policyService.canUserStartPolicy(user, policy);
         if (!canStart) {
-            throw new RuntimeException("No tienes permisos para iniciar este proceso desde tu area");
+            throw new RuntimeException("No tienes permisos para iniciar este proceso desde tu área");
         }
 
         ProcessInstance processInstance = new ProcessInstance();
@@ -117,7 +117,7 @@ public class ProcessExecutionService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La tarea no tiene fecha de inicio registrada");
         }
         if (taskInstance.getAssignedTo() != null && !taskInstance.getAssignedTo().equals(username)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "La tarea esta siendo ejecutada por otro usuario");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "La tarea está siendo ejecutada por otro usuario");
         }
 
         // ==========================================================
@@ -435,7 +435,7 @@ public class ProcessExecutionService {
         ProcessInstance processInstance = processInstanceRepository.findById(taskInstance.getProcessInstanceId())
                 .orElseThrow(() -> new RuntimeException("Instancia de proceso no encontrada"));
         Policy policy = policyRepository.findById(processInstance.getPolicyId())
-                .orElseThrow(() -> new RuntimeException("Politica no encontrada"));
+                .orElseThrow(() -> new RuntimeException("Política no encontrada"));
 
         NodeTaskDefinition nodeDefinition = extractTaskDefinition(policy.getDiagramJson(), taskInstance.getTaskId());
         String processName = processInstance.getTitle() != null && !processInstance.getTitle().isBlank()
@@ -447,6 +447,7 @@ public class ProcessExecutionService {
 
         return new TaskDetailDto(
                 taskInstance.getId(),
+                processInstance.getId(),
                 processInstance.getPolicyId(),
                 taskInstance.getTaskId(),
                 taskName,

@@ -66,7 +66,7 @@ public class AuthService {
     public String loginForMobileClient(String username, String password) {
         User user = authenticate(username, password);
         if (!isClientAreaUser(user)) {
-            throw new ResponseStatusException(UNAUTHORIZED, "Acceso mobile permitido solo para el area Cliente");
+            throw new ResponseStatusException(UNAUTHORIZED, "Acceso móvil permitido solo para el área Cliente");
         }
         return tokenService.createTokenForUser(user);
     }

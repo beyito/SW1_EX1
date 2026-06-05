@@ -1,26 +1,26 @@
 <section class="admin-shell">
   <div class="panel">
     <div class="panel-header" style="margin-bottom: 1.5rem;">
-      <h2>Gestion de Areas, Funcionarios y Clientes</h2>
+      <h2>Gestión de Áreas, Funcionarios y Clientes</h2>
       <p style="margin: 0; color: #6b7280; font-size: 1.05rem;">
-        Los funcionarios deben pertenecer a un area distinta de Cliente. Los clientes se gestionan por separado con usuario y contrasena.
+        Los funcionarios deben pertenecer a un área distinta de Cliente. Los clientes se gestionan por separado con usuario y contraseña.
       </p>
     </div>
 
     <div class="panel-card">
-      <h3>Crear Area</h3>
-      <label>Nombre del area</label>
-      <input type="text" [(ngModel)]="newAreaName" placeholder="Nombre del area" />
-      <button type="button" (click)="createArea()" [disabled]="areaLoading">Crear area</button>
+      <h3>Crear Área</h3>
+      <label>Nombre del área</label>
+      <input type="text" [(ngModel)]="newAreaName" placeholder="Nombre del área" />
+      <button type="button" (click)="createArea()" [disabled]="areaLoading">Crear área</button>
       @if (areaMessage) {
         <p class="message">{{ areaMessage }}</p>
       }
     </div>
 
     <div class="panel-card">
-      <h3>Areas registradas</h3>
+      <h3>Áreas registradas</h3>
       @if (areas.length === 0) {
-        <p class="hint">No hay areas registradas todavia.</p>
+        <p class="hint">No hay áreas registradas todavía.</p>
       } @else {
         <table class="admin-table">
           <thead>
@@ -34,7 +34,7 @@
               <tr>
                 <td>
                   @if (editingAreaId === area.id) {
-                    <input type="text" [(ngModel)]="editingAreaName" placeholder="Nombre del area" />
+                    <input type="text" [(ngModel)]="editingAreaName" placeholder="Nombre del área" />
                   } @else {
                     {{ area.name }}
                   }
@@ -57,7 +57,7 @@
 
     <div class="panel-card">
       <h3>Crear Funcionario</h3>
-      <label>Area</label>
+      <label>Área</label>
       <select [(ngModel)]="funcArea">
         @for (area of selectableAreas; track area.id) {
           <option [value]="area.name">{{ area.name }}</option>
@@ -65,27 +65,27 @@
       </select>
       <label>Usuario</label>
       <input type="text" [(ngModel)]="funcUsername" placeholder="Nombre de usuario" />
-      <label>Contrasena</label>
-      <input type="password" [(ngModel)]="funcPassword" placeholder="Contrasena" />
+      <label>Contraseña</label>
+      <input type="password" [(ngModel)]="funcPassword" placeholder="Contraseña" />
       <button type="button" (click)="createFunctionary()" [disabled]="funcLoading || selectableAreas.length === 0">Crear funcionario</button>
       @if (funcMessage) {
         <p class="message">{{ funcMessage }}</p>
       }
       @if (selectableAreas.length === 0) {
-        <p class="hint">Primero crea un area distinta de Cliente para registrar funcionarios.</p>
+        <p class="hint">Primero crea un área distinta de Cliente para registrar funcionarios.</p>
       }
     </div>
 
     <div class="panel-card">
       <h3>Funcionarios registrados</h3>
       @if (functionaries.length === 0) {
-        <p class="hint">No hay funcionarios registrados todavia.</p>
+        <p class="hint">No hay funcionarios registrados todavía.</p>
       } @else {
         <table class="admin-table">
           <thead>
             <tr>
               <th>Usuario</th>
-              <th>Area</th>
+              <th>Área</th>
               <th>Acciones</th>
             </tr>
           </thead>
@@ -112,7 +112,7 @@
                 </td>
                 <td class="actions-cell">
                   @if (editingFunctionaryId === func.id) {
-                    <input type="password" [(ngModel)]="editingFunctionaryPassword" placeholder="Nueva contrasena (opcional)" />
+                    <input type="password" [(ngModel)]="editingFunctionaryPassword" placeholder="Nueva contraseña (opcional)" />
                     <button type="button" class="btn-secondary" (click)="saveFunctionary(func.id)" [disabled]="funcLoading">Guardar</button>
                     <button type="button" class="btn-secondary" (click)="cancelEditFunctionary()" [disabled]="funcLoading">Cancelar</button>
                   } @else {
@@ -129,11 +129,11 @@
 
     <div class="panel-card">
       <h3>Crear Cliente</h3>
-      <p class="hint">El cliente siempre pertenece al area Cliente.</p>
+      <p class="hint">El cliente siempre pertenece al área Cliente.</p>
       <label>Usuario</label>
       <input type="text" [(ngModel)]="clientUsername" placeholder="Nombre de usuario" />
-      <label>Contrasena</label>
-      <input type="password" [(ngModel)]="clientPassword" placeholder="Contrasena" />
+      <label>Contraseña</label>
+      <input type="password" [(ngModel)]="clientPassword" placeholder="Contraseña" />
       <button type="button" (click)="createClient()" [disabled]="clientLoading">Crear cliente</button>
       @if (clientMessage) {
         <p class="message">{{ clientMessage }}</p>
@@ -143,13 +143,13 @@
     <div class="panel-card">
       <h3>Clientes registrados</h3>
       @if (clients.length === 0) {
-        <p class="hint">No hay clientes registrados todavia.</p>
+        <p class="hint">No hay clientes registrados todavía.</p>
       } @else {
         <table class="admin-table">
           <thead>
             <tr>
               <th>Usuario</th>
-              <th>Area</th>
+              <th>Área</th>
               <th>Acciones</th>
             </tr>
           </thead>
@@ -166,7 +166,7 @@
                 <td>{{ client.area || 'Cliente' }}</td>
                 <td class="actions-cell">
                   @if (editingClientId === client.id) {
-                    <input type="password" [(ngModel)]="editingClientPassword" placeholder="Nueva contrasena (opcional)" />
+                    <input type="password" [(ngModel)]="editingClientPassword" placeholder="Nueva contraseña (opcional)" />
                     <button type="button" class="btn-secondary" (click)="saveClient(client.id)" [disabled]="clientLoading">Guardar</button>
                     <button type="button" class="btn-secondary" (click)="cancelEditClient()" [disabled]="clientLoading">Cancelar</button>
                   } @else {

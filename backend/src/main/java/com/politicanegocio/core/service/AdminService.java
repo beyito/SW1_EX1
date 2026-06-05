@@ -95,9 +95,9 @@ public class AdminService {
     }
 
     public Area createArea(String name, String company, User creator) {
-        String normalizedName = normalizeRequiredValue(name, "El nombre del area es obligatorio");
+        String normalizedName = normalizeRequiredValue(name, "El nombre del área es obligatorio");
         if (areaRepository.findByNameIgnoreCaseAndCompanyIgnoreCase(normalizedName, company).isPresent()) {
-            throw new ResponseStatusException(BAD_REQUEST, "El area ya existe en esta empresa");
+            throw new ResponseStatusException(BAD_REQUEST, "El área ya existe en esta empresa");
         }
 
         Area area = new Area();
@@ -109,12 +109,12 @@ public class AdminService {
     public Area updateArea(String areaId, String company, String name, User creator) {
         Area area = areaRepository.findByIdAndCompany(areaId, company)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Area no encontrada"));
-        String normalizedName = normalizeRequiredValue(name, "El nombre del area es obligatorio");
+        String normalizedName = normalizeRequiredValue(name, "El nombre del área es obligatorio");
 
         if (areaRepository.findByNameIgnoreCaseAndCompanyIgnoreCase(normalizedName, company)
                 .filter(found -> !Objects.equals(found.getId(), areaId))
                 .isPresent()) {
-            throw new ResponseStatusException(BAD_REQUEST, "El area ya existe en esta empresa");
+            throw new ResponseStatusException(BAD_REQUEST, "El área ya existe en esta empresa");
         }
 
         String previousName = area.getName();
@@ -138,13 +138,13 @@ public class AdminService {
         Area area = areaRepository.findByIdAndCompany(areaId, company)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Area no encontrada"));
         if (CLIENT_AREA_NAME.equalsIgnoreCase(area.getName())) {
-            throw new ResponseStatusException(BAD_REQUEST, "No se puede eliminar el area Cliente");
+            throw new ResponseStatusException(BAD_REQUEST, "No se puede eliminar el área Cliente");
         }
 
         boolean inUse = userRepository.findByCompany(company).stream()
                 .anyMatch(user -> area.getName().equalsIgnoreCase(user.getArea()));
         if (inUse) {
-            throw new ResponseStatusException(BAD_REQUEST, "No se puede eliminar un area con usuarios asignados");
+            throw new ResponseStatusException(BAD_REQUEST, "No se puede eliminar un área con usuarios asignados");
         }
         areaRepository.delete(area);
     }
@@ -153,12 +153,12 @@ public class AdminService {
         String normalizedUsername = normalizeRequiredValue(username, "El usuario es obligatorio");
         validatePassword(rawPassword);
         ensureClientAreaExists(company);
-        String normalizedArea = normalizeRequiredValue(areaName, "El area del funcionario es obligatoria");
+        String normalizedArea = normalizeRequiredValue(areaName, "El área del funcionario es obligatoria");
         if (CLIENT_AREA_NAME.equalsIgnoreCase(normalizedArea)) {
-            throw new ResponseStatusException(BAD_REQUEST, "Un funcionario no puede pertenecer al area Cliente");
+            throw new ResponseStatusException(BAD_REQUEST, "Un funcionario no puede pertenecer al área Cliente");
         }
         areaRepository.findByNameIgnoreCaseAndCompanyIgnoreCase(normalizedArea, company)
-                .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "El area seleccionada no existe en esta empresa"));
+                .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "El área seleccionada no existe en esta empresa"));
         validateUniqueUsername(normalizedUsername, null);
 
         User user = new User();
@@ -180,12 +180,12 @@ public class AdminService {
         }
 
         String normalizedUsername = normalizeRequiredValue(username, "El usuario es obligatorio");
-        String normalizedArea = normalizeRequiredValue(areaName, "El area del funcionario es obligatoria");
+        String normalizedArea = normalizeRequiredValue(areaName, "El área del funcionario es obligatoria");
         if (CLIENT_AREA_NAME.equalsIgnoreCase(normalizedArea)) {
-            throw new ResponseStatusException(BAD_REQUEST, "Un funcionario no puede pertenecer al area Cliente");
+            throw new ResponseStatusException(BAD_REQUEST, "Un funcionario no puede pertenecer al área Cliente");
         }
         areaRepository.findByNameIgnoreCaseAndCompanyIgnoreCase(normalizedArea, company)
-                .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "El area seleccionada no existe en esta empresa"));
+                .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "El área seleccionada no existe en esta empresa"));
         validateUniqueUsername(normalizedUsername, functionary.getId());
         functionary.setUsername(normalizedUsername);
         if (rawPassword != null && !rawPassword.isBlank()) {
@@ -297,7 +297,7 @@ public class AdminService {
 
     private void validatePassword(String rawPassword) {
         if (rawPassword == null || rawPassword.isBlank()) {
-            throw new ResponseStatusException(BAD_REQUEST, "La contrasena es obligatoria");
+            throw new ResponseStatusException(BAD_REQUEST, "La contraseña es obligatoria");
         }
     }
 }

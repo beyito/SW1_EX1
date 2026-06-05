@@ -1,11 +1,11 @@
-<section class="task-execution-page">
+﻿<section class="task-execution-page">
   @if (loading) {
     <div class="card">
       <p>Cargando detalle de tarea...</p>
     </div>
   } @else if (!taskDetail) {
     <div class="card">
-      <p>No se encontro informacion de la tarea.</p>
+      <p>No se encontró información de la tarea.</p>
       @if (message) {
         <p class="message">{{ message }}</p>
       }
@@ -76,7 +76,7 @@
                 }
                 @case ('select') {
                   <select [id]="fieldName(field, $index)" [formControlName]="fieldName(field, $index)">
-                    <option value="">Selecciona una opcion</option>
+                    <option value="">Selecciona una opción</option>
                     @for (option of field.options || []; track option) {
                       <option [value]="option">{{ option }}</option>
                     }
@@ -101,11 +101,11 @@
                     <input type="hidden" [formControlName]="fieldName(field, $index)" />
 
                     @if (uploadingFiles[fieldName(field, $index)]) {
-                      <small style="color: #007bff; display: block; margin-top: 5px;">⏳ Subiendo archivo a AWS...</small>
+                      <small style="color: #007bff; display: block; margin-top: 5px;">Subiendo archivo a AWS...</small>
                     }
 
                     @if (formGroup.get(fieldName(field, $index))?.value && !uploadingFiles[fieldName(field, $index)]) {
-                      <small style="color: #28a745; display: block; margin-top: 5px;">✅ Archivo adjunto correctamente</small>
+                      <small style="color: #28a745; display: block; margin-top: 5px;">Archivo adjunto correctamente</small>
                     }
                   </div>
                 }
@@ -135,7 +135,7 @@
             }
 
             @if (formGroup.invalid && formGroup.touched) {
-              <p class="error-hint">⚠️ Debes completar todos los campos obligatorios antes de continuar.</p>
+              <p class="error-hint">Debes completar todos los campos obligatorios antes de continuar.</p>
             }
           </div>
         </form>
@@ -151,8 +151,8 @@
                 <span class="answer-value">
                   
                   @if (field.type === 'file' && savedAnswers[fieldName(field, i)]) {
-                    <a [href]="savedAnswers[fieldName(field, i)]" target="_blank" class="download-link" style="color: #007bff; text-decoration: underline;">
-                      📄 Ver Documento Adjunto
+                    <a [href]="documentHref(savedAnswers[fieldName(field, i)])" target="_blank" class="download-link" style="color: #007bff; text-decoration: underline;">
+                      Ver Documento Adjunto
                     </a>
                   } @else {
                     {{ savedAnswers[fieldName(field, i)] ?? 'Sin respuesta' }}
@@ -173,3 +173,4 @@
     </article>
   }
 </section>
+

@@ -24,10 +24,10 @@ import { AuthService } from './auth.service';
             <strong>{{ profile?.username }}</strong>
             <small>{{ profile?.company || 'Empresa' }}</small>
           </div>
-          <button class="logout-btn" (click)="logout()">Cerrar sesion</button>
+          <button class="logout-btn" (click)="logout()">Cerrar sesión</button>
         </ng-container>
         <ng-template #loginAction>
-          <button class="login-btn" (click)="goToLogin()">Iniciar sesion</button>
+          <button class="login-btn" (click)="goToLogin()">Iniciar sesión</button>
         </ng-template>
       </div>
     </header>

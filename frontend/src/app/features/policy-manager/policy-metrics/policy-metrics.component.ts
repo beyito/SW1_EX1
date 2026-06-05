@@ -38,7 +38,7 @@ export class PolicyMetricsComponent implements OnInit {
   public async loadMetrics(): Promise<void> {
     if (!this.policyId) {
       this.metrics = [];
-      this.message = 'No se encontro la politica solicitada.';
+      this.message = 'No se encontró la política solicitada.';
       this.cdr.detectChanges(); // Forzamos actualización visual
       return;
     }
@@ -51,14 +51,14 @@ export class PolicyMetricsComponent implements OnInit {
       this.metrics = await this.metricsService.getPolicyMetrics(this.policyId);
       
       if (this.metrics.length === 0) {
-        this.message = 'No hay datos suficientes para calcular metricas en esta politica.';
+        this.message = 'No hay datos suficientes para calcular métricas en esta política.';
       } else {
         // MEJORA: Ordenamos de mayor a menor tiempo total para asegurar que el [0] sea el cuello de botella
         this.metrics.sort((a, b) => b.avgTotalMinutes - a.avgTotalMinutes);
       }
     } catch (error) {
       this.metrics = [];
-      this.message = error instanceof Error ? error.message : 'No se pudieron cargar las metricas.';
+      this.message = error instanceof Error ? error.message : 'No se pudieron cargar las métricas.';
     } finally {
       this.loading = false;
       this.cdr.detectChanges(); // <-- LA SOLUCIÓN: Obligamos a Angular a repintar la pantalla sin el loader

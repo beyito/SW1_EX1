@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+﻿import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -38,7 +38,7 @@ export class TaskExecutionComponent implements OnInit {
   public lastTranscript = '';
   public pendingTranscript = '';
 
-  // 🚩 AGREGADO PARA S3: Control de estado de subida por cada campo
+  // AGREGADO PARA S3: Control de estado de subida por cada campo
   public uploadingFiles: Record<string, boolean> = {};
 
   public ngOnInit(): void {
@@ -55,7 +55,7 @@ export class TaskExecutionComponent implements OnInit {
 
   public async loadTaskDetails(): Promise<void> {
     if (!this.taskId) {
-      this.message = 'No se encontro una tarea para ejecutar.';
+      this.message = 'No se encontró una tarea para ejecutar.';
       this.cdr.detectChanges(); 
       return;
     }
@@ -100,7 +100,7 @@ export class TaskExecutionComponent implements OnInit {
     }
   }
 
-  // 🚩 AGREGADO PARA S3: Método para interceptar archivos y subirlos
+  // AGREGADO PARA S3: Método para interceptar archivos y subirlos
   public async onFileSelected(event: Event, controlName: string): Promise<void> {
     const input = event.target as HTMLInputElement;
     if (!input.files || input.files.length === 0) return;
@@ -110,10 +110,10 @@ export class TaskExecutionComponent implements OnInit {
     this.cdr.detectChanges(); // Despertar UI para mostrar "Subiendo..."
 
     try {
-      const policyId = this.taskDetail?.policyId || 'general'; 
-      const uploadResult = await this.executionService.uploadFile(file, policyId);
+      const processInstanceId = this.taskDetail?.processInstanceId || 'general';
+      const uploadResult = await this.executionService.uploadFile(file, processInstanceId, controlName);
       
-      this.formGroup.get(controlName)?.setValue(uploadResult.url);
+      this.formGroup.get(controlName)?.setValue(uploadResult.documentId || uploadResult.url);
       this.formGroup.get(controlName)?.markAsDirty();
     } catch (error) {
       console.error('Error subiendo archivo a S3:', error);
@@ -231,6 +231,17 @@ export class TaskExecutionComponent implements OnInit {
 
   public statusClass(status: string): string { 
     return `status-badge ${status.toLowerCase()}`;
+  }
+
+  public documentHref(value: unknown): string {
+    const rawValue = String(value ?? '').trim();
+    if (!rawValue) {
+      return '';
+    }
+    if (/^https?:\/\//i.test(rawValue)) {
+      return rawValue;
+    }
+    return `/documents/${encodeURIComponent(rawValue)}`;
   }
 
   public fieldName(field: TaskFormField, index: number): string {

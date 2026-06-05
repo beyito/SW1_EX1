@@ -39,7 +39,7 @@ public class WorkflowEngine {
 
     public List<WorkflowNode> getNextNodes(String policyId, String currentNodeId, Map<String, Object> routingVariables) {
         Policy policy = policyRepository.findById(policyId)
-                .orElseThrow(() -> new RuntimeException("Politica no encontrada con ID: " + policyId));
+                .orElseThrow(() -> new RuntimeException("Política no encontrada con ID: " + policyId));
 
         try {
             JsonNode root = objectMapper.readTree(policy.getDiagramJson());
@@ -143,7 +143,7 @@ public class WorkflowEngine {
 
     public String getNodeName(String policyId, String nodeId) {
         Policy policy = policyRepository.findById(policyId)
-                .orElseThrow(() -> new RuntimeException("Politica no encontrada con ID: " + policyId));
+                .orElseThrow(() -> new RuntimeException("Política no encontrada con ID: " + policyId));
         try {
             JsonNode root = objectMapper.readTree(policy.getDiagramJson());
             if (!root.has("cells")) {
@@ -181,7 +181,7 @@ public class WorkflowEngine {
                 .filter(node -> "START".equalsIgnoreCase(node.path("nodeType").asText()))
                 .map(node -> node.path("id").asText())
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("No se encontro un nodo START en la politica"));
+                .orElseThrow(() -> new RuntimeException("No se encontró un nodo START en la política"));
     }
 
     private String getNodeLabel(JsonNode node) {
@@ -201,7 +201,7 @@ public class WorkflowEngine {
 
     public String getFormSchemaForNode(String policyId, String nodeId) {
         Policy policy = policyRepository.findById(policyId)
-                .orElseThrow(() -> new RuntimeException("Politica no encontrada con ID: " + policyId));
+                .orElseThrow(() -> new RuntimeException("Política no encontrada con ID: " + policyId));
 
         try {
             JsonNode root = objectMapper.readTree(policy.getDiagramJson());
@@ -228,7 +228,7 @@ public class WorkflowEngine {
     }
     public List<String> getIncomingNodeIds(String policyId, String targetNodeId) {
         Policy policy = policyRepository.findById(policyId)
-                .orElseThrow(() -> new RuntimeException("Politica no encontrada con ID: " + policyId));
+                .orElseThrow(() -> new RuntimeException("Política no encontrada con ID: " + policyId));
         
         List<String> incomingIds = new ArrayList<>();
         try {

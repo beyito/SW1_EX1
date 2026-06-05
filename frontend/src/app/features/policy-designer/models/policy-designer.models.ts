@@ -2,6 +2,15 @@ export interface PolicySummary {
   id: string;
   name: string;
   description?: string;
+  initialRequirements?: PolicyInitialRequirement[];
+}
+
+export interface PolicyInitialRequirement {
+  id: string;
+  name: string;
+  description?: string;
+  required: boolean;
+  allowedExtensions?: string[];
 }
 
 export interface CompanyArea {
@@ -47,6 +56,7 @@ export interface NodeMetadata {
 export interface PolicyPayload extends PolicySummary {
   diagramJson?: string;
   lanes?: Lane[];
+  initialRequirements?: PolicyInitialRequirement[];
 }
 
 export interface DiagramState {

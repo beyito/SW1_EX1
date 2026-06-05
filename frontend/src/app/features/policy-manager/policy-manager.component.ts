@@ -36,10 +36,10 @@ export class PolicyManagerComponent implements OnInit {
     try {
       this.policies = await this.policyDataService.getAllPolicies();
       if (this.policies.length === 0) {
-        this.message = 'Aun no existen politicas creadas.';
+        this.message = 'Aún no existen políticas creadas.';
       }
     } catch (error) {
-      this.message = error instanceof Error ? error.message : 'No se pudo cargar la lista de politicas.';
+      this.message = error instanceof Error ? error.message : 'No se pudo cargar la lista de políticas.';
     } finally {
       this.loading = false;
       this.cdr.detectChanges(); // 🚩 Despierta Angular, ya terminamos de cargar
@@ -51,7 +51,7 @@ export class PolicyManagerComponent implements OnInit {
     const description = this.newPolicyDescription.trim();
 
     if (!name) {
-      this.message = 'Ingresa un nombre para la nueva politica.';
+      this.message = 'Ingresa un nombre para la nueva política.';
       this.cdr.detectChanges(); // 🚩 Actualizamos la vista para mostrar el error
       return;
     }
@@ -66,7 +66,7 @@ export class PolicyManagerComponent implements OnInit {
       this.newPolicyDescription = '';
       await this.router.navigate(['/designer', policy.id]);
     } catch (error) {
-      this.message = error instanceof Error ? error.message : 'No se pudo crear la politica.';
+      this.message = error instanceof Error ? error.message : 'No se pudo crear la política.';
     } finally {
       this.creating = false;
       this.cdr.detectChanges(); // 🚩 Terminamos de crear
