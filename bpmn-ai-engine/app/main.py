@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import logging
+import re
+from difflib import SequenceMatcher
 from typing import Any, Dict, List
 
 from fastapi import FastAPI, HTTPException, Request
@@ -57,6 +59,36 @@ class VoiceFillRequest(BaseModel):
     form_fields: List[str] = Field(default_factory=list)
 
 
+class PolicyRequirementCandidate(BaseModel):
+    id: str = ""
+    name: str = ""
+    required: bool = False
+
+
+class PolicyIntentCandidate(BaseModel):
+    id: str
+    name: str
+    description: str = ""
+    initial_requirements: List[PolicyRequirementCandidate] = Field(default_factory=list)
+
+
+class PolicyIntentRequest(BaseModel):
+    text: str = Field(..., min_length=1)
+    policies: List[PolicyIntentCandidate] = Field(default_factory=list)
+
+
+class PolicyIntentCandidateResponse(BaseModel):
+    policyId: str
+    policyName: str
+    confidence: float
+    missing_requirements: List[str] = Field(default_factory=list)
+    reason: str = ""
+
+
+class PolicyIntentResponse(BaseModel):
+    candidates: List[PolicyIntentCandidateResponse] = Field(default_factory=list)
+
+
 @app.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
     return HealthResponse(
@@ -81,6 +113,154 @@ def _resolve_model_candidates(requested_models: List[str]) -> List[str]:
         seen.add(model)
         deduped.append(model)
     return deduped or [settings.ai_model]
+
+
+def _tokenize(value: str) -> set[str]:
+    normalized = re.sub(r"[^a-zA-Z0-9]+", " ", value or "").lower()
+    return {token for token in normalized.split() if len(token) > 2}
+
+
+def _lexical_policy_match(text: str, policies: List[PolicyIntentCandidate]) -> PolicyIntentResponse:
+    text_tokens = _tokenize(text)
+    scored: List[PolicyIntentCandidateResponse] = []
+
+    for policy in policies:
+        policy_text = f"{policy.name} {policy.description}"
+        policy_tokens = _tokenize(policy_text)
+        overlap = len(text_tokens.intersection(policy_tokens)) / max(len(text_tokens.union(policy_tokens)), 1)
+        sequence = SequenceMatcher(None, (text or "").lower(), policy_text.lower()).ratio()
+        score = max(overlap, sequence * 0.72)
+        missing = [
+            requirement.name
+            for requirement in policy.initial_requirements
+            if requirement.required and requirement.name.strip()
+        ]
+        scored.append(
+            PolicyIntentCandidateResponse(
+                policyId=policy.id,
+                policyName=policy.name,
+                confidence=round(min(max(score, 0.0), 0.99), 4),
+                missing_requirements=missing,
+                reason="Coincidencia calculada con clasificador lexico local.",
+            )
+        )
+
+    scored.sort(key=lambda item: item.confidence, reverse=True)
+    return PolicyIntentResponse(candidates=scored[:3])
+
+
+@app.post("/api/v1/agent/policy-intent", response_model=PolicyIntentResponse)
+def classify_policy_intent(payload: PolicyIntentRequest, http_request: Request) -> PolicyIntentResponse:
+    request_id = http_request.headers.get("X-Request-Id", "").strip() or "n/a"
+    text = (payload.text or "").strip()
+    policies = payload.policies or []
+
+    if not text:
+        raise HTTPException(status_code=400, detail="text es obligatorio")
+    if not policies:
+        raise HTTPException(status_code=400, detail="policies es obligatorio")
+
+    if openai_client is None:
+        logger.warning("policy_intent fallback: AI_API_KEY no configurado request_id=%s", request_id)
+        return _lexical_policy_match(text, policies)
+
+    system_prompt = (
+        "Eres un agente de recepción inteligente para un iBPMS. "
+        "Debes mapear la necesidad escrita o hablada del cliente contra el catálogo de trámites disponibles. "
+        "Devuelve un JSON con la clave candidates, que debe ser una lista de hasta 3 opciones. "
+        "Cada opcion debe tener: policyId, policyName, confidence, missing_requirements, reason. "
+        "confidence debe estar entre 0 y 1. "
+        "missing_requirements debe contener los nombres de requisitos iniciales obligatorios de cada politica. "
+        "No inventes policyId. Si no hay coincidencias razonables, devuelve candidates vacio."
+    )
+    user_payload = {
+        "client_text": text,
+        "policies": [policy.model_dump() for policy in policies],
+    }
+
+    try:
+        completion = None
+        selected_model = ""
+        last_error: Exception | None = None
+        for model in _resolve_model_candidates([]):
+            try:
+                completion = openai_client.chat.completions.create(
+                    model=model,
+                    temperature=0,
+                    response_format={"type": "json_object"},
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": json.dumps(user_payload, ensure_ascii=True)},
+                    ],
+                )
+                selected_model = model
+                break
+            except Exception as model_exception:
+                last_error = model_exception
+                logger.warning(
+                    "policy_intent model failed request_id=%s model=%s error=%s",
+                    request_id,
+                    model,
+                    model_exception,
+                )
+                continue
+
+        if completion is None:
+            if last_error is not None:
+                raise last_error
+            raise RuntimeError("No se obtuvo respuesta de ningun modelo configurado.")
+
+        raw = (completion.choices[0].message.content or "").strip()
+        parsed = json.loads(raw) if raw else {}
+        policy_by_id = {policy.id: policy for policy in policies}
+        raw_candidates = parsed.get("candidates", [])
+        if not isinstance(raw_candidates, list):
+            raw_candidates = [parsed]
+
+        candidates: List[PolicyIntentCandidateResponse] = []
+        for raw_candidate in raw_candidates:
+            if not isinstance(raw_candidate, dict):
+                continue
+            policy_id = str(raw_candidate.get("policyId", "")).strip()
+            selected_policy = policy_by_id.get(policy_id)
+            if selected_policy is None:
+                continue
+            missing = [
+                requirement.name
+                for requirement in selected_policy.initial_requirements
+                if requirement.required and requirement.name.strip()
+            ]
+            confidence = float(raw_candidate.get("confidence", 0) or 0)
+            candidates.append(
+                PolicyIntentCandidateResponse(
+                    policyId=selected_policy.id,
+                    policyName=selected_policy.name,
+                    confidence=round(min(max(confidence, 0.0), 1.0), 4),
+                    missing_requirements=missing,
+                    reason=str(raw_candidate.get("reason", "")).strip() or "Clasificacion realizada por IA.",
+                )
+            )
+
+        if not candidates:
+            fallback = _lexical_policy_match(text, policies)
+            if fallback.candidates:
+                fallback.candidates[0].reason = "La IA no devolvio candidatos validos; se aplico fallback lexico."
+            return fallback
+
+        candidates.sort(key=lambda item: item.confidence, reverse=True)
+        logger.info(
+            "policy_intent success request_id=%s model=%s candidates=%s",
+            request_id,
+            selected_model,
+            len(candidates),
+        )
+        return PolicyIntentResponse(candidates=candidates[:3])
+    except Exception as exception:
+        logger.exception("policy_intent error request_id=%s", request_id)
+        fallback = _lexical_policy_match(text, policies)
+        if fallback.candidates:
+            fallback.candidates[0].reason = f"Fallback lexico por error IA: {exception.__class__.__name__}"
+        return fallback
 
 
 @app.post("/api/v1/agent/voice-fill")
