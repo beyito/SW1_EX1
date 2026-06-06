@@ -1,0 +1,132 @@
+<section class="prediction-shell">
+  <header class="hero-card">
+    <div>
+      <span class="eyebrow">Fase 4 · TensorFlow</span>
+      <h2>Predicción operativa de tu empresa</h2>
+      <p>
+        Analiza solo los trámites, tareas y documentos de tu empresa para detectar anomalías,
+        priorizar instancias y anticipar cuellos de botella.
+      </p>
+    </div>
+    <button type="button" (click)="loadAnalysis()" [disabled]="loading">
+      {{ loading ? 'Analizando...' : 'Actualizar análisis' }}
+    </button>
+  </header>
+
+  @if (message) {
+    <div class="alert error">{{ message }}</div>
+  }
+
+  @if (analysis?.warnings?.length) {
+    <div class="alert warning">
+      @for (warning of analysis?.warnings; track warning) {
+        <span>{{ warning }}</span>
+      }
+    </div>
+  }
+
+  @if (analysis) {
+    <section class="summary-grid">
+      <article>
+        <span>Estrategia</span>
+        <strong>{{ modelStrategyLabel(analysis.modelStrategy) }}</strong>
+      </article>
+      <article>
+        <span>Anomalías</span>
+        <strong>{{ analysis.anomalies.length }}</strong>
+      </article>
+      <article>
+        <span>Prioridades</span>
+        <strong>{{ analysis.priorities.length }}</strong>
+      </article>
+      <article>
+        <span>Cuellos de botella</span>
+        <strong>{{ analysis.bottlenecks.length }}</strong>
+      </article>
+    </section>
+  }
+
+  @if (!loading && analysis && !hasData) {
+    <section class="empty-state">
+      <h3>No hay señales críticas todavía</h3>
+      <p>
+        El motor no encontró patrones suficientes o eventos de riesgo en los trámites de esta empresa.
+        A medida que se ejecuten más procesos, las predicciones serán más útiles.
+      </p>
+    </section>
+  }
+
+  @if (analysis && hasData) {
+    <section class="prediction-grid">
+      <article class="prediction-card priority-card">
+        <h3>Prioridad de instancias</h3>
+        @if (analysis.priorities.length === 0) {
+          <p class="muted">Sin prioridades calculadas.</p>
+        } @else {
+          @for (priority of analysis.priorities; track trackPriority($index, priority)) {
+            <div class="item-row">
+              <span class="badge" [ngClass]="priorityClass(priority.priority)">{{ priority.priority || 'N/D' }}</span>
+              <div>
+                <strong>{{ priority.processTitle || priority.policyName || 'Instancia de trámite' }}</strong>
+                <p>{{ priority.reason || 'Sin explicación disponible.' }}</p>
+                <small>Trámite: {{ priority.policyName || 'Sin nombre' }} · Confianza: {{ asPercent(priority.score) }}</small>
+              </div>
+            </div>
+          }
+        }
+      </article>
+
+      <article class="prediction-card">
+        <h3>Anomalías detectadas</h3>
+        @if (analysis.anomalies.length === 0) {
+          <p class="muted">Sin anomalías detectadas.</p>
+        } @else {
+          @for (anomaly of analysis.anomalies; track trackAnomaly($index, anomaly)) {
+            <div class="item-row">
+              <span class="badge danger">{{ anomalyTypeLabel(anomaly.type) }}</span>
+              <div>
+                <strong>{{ anomaly.processTitle || anomaly.documentName || 'Evento del trámite' }}</strong>
+                <p>{{ anomaly.reason || 'Revisar comportamiento fuera de patrón.' }}</p>
+                <small>Tarea: {{ anomaly.taskLabel || 'N/D' }} · Carril: {{ anomaly.laneName || 'N/D' }} · Intensidad: {{ asPercent(anomaly.score) }}</small>
+              </div>
+            </div>
+          }
+        }
+      </article>
+
+      <article class="prediction-card">
+        <h3>Rutas probables</h3>
+        @if (analysis.routePredictions.length === 0) {
+          <p class="muted">Sin rutas probables suficientes.</p>
+        } @else {
+          @for (route of analysis.routePredictions; track trackRoute($index, route)) {
+            <div class="route-row">
+              <strong>{{ route.currentTaskLabel || 'Paso actual' }}</strong>
+              <span>→</span>
+              <strong>{{ route.predictedNextTaskLabel || 'Siguiente paso' }}</strong>
+              <small>{{ asPercent(route.probability) }} de probabilidad · {{ route.support || 0 }} casos similares</small>
+            </div>
+          }
+        }
+      </article>
+
+      <article class="prediction-card">
+        <h3>Cuellos de botella</h3>
+        @if (analysis.bottlenecks.length === 0) {
+          <p class="muted">Sin carriles saturados.</p>
+        } @else {
+          @for (bottleneck of analysis.bottlenecks; track trackBottleneck($index, bottleneck)) {
+            <div class="item-row">
+              <span class="badge warning">{{ asPercent(bottleneck.risk) }}</span>
+              <div>
+                <strong>{{ bottleneck.laneName || 'Carril del flujo' }}</strong>
+                <p>{{ bottleneck.reason || 'Carril con presión operativa.' }}</p>
+                <small>Pendientes: {{ bottleneck.pendingTasks || 0 }} · Espera prom.: {{ bottleneck.avgWaitMinutes || 0 }} min</small>
+              </div>
+            </div>
+          }
+        }
+      </article>
+    </section>
+  }
+</section>

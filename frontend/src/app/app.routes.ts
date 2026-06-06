@@ -7,6 +7,7 @@ import { PolicyManagerComponent } from './features/policy-manager/policy-manager
 import { PolicyMetricsComponent } from './features/policy-manager/policy-metrics/policy-metrics.component';
 import { DocumentPrivilegesComponent } from './features/document-admin/document-privileges.component';
 import { DocumentAuditComponent } from './features/document-admin/document-audit.component';
+import { PredictiveAnalyticsComponent } from './features/predictive-analytics/components/predictive-analytics/predictive-analytics.component';
 import { PolicyDesignerComponent } from './features/policy-designer/components/policy-designer/policy-designer.component';
 import { TaskInboxComponent } from './features/execution/components/task-inbox/task-inbox.component';
 import { FuncionarioDashboardComponent } from './features/execution/components/funcionario-dashboard/funcionario-dashboard.component';
@@ -32,6 +33,7 @@ export const routes: Routes = [
       { path: 'funcionarios', component: FuncionariosComponent },
       { path: 'policies', component: PolicyManagerComponent },
       { path: 'policies/:policyId/metrics', component: PolicyMetricsComponent },
+      { path: 'predictions', component: PredictiveAnalyticsComponent },
       { path: 'document-privileges', component: DocumentPrivilegesComponent },
       { path: 'document-audit', component: DocumentAuditComponent },
       { path: '', redirectTo: 'funcionarios', pathMatch: 'full' }
