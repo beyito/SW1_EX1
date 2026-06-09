@@ -6,9 +6,9 @@ services:
     container_name: bpmn-frontend
     ports:
       - "80:80"
-      # - "443:443"      # <-- NUEVO: Abrimos el puerto HTTPS
-    # volumes:           # <-- NUEVO: Le pasamos los certificados al contenedor
-      # - /etc/letsencrypt:/etc/letsencrypt:ro
+      - "443:443"      # <-- NUEVO: Abrimos el puerto HTTPS
+    volumes:           # <-- NUEVO: Le pasamos los certificados al contenedor
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       - backend
       - onlyoffice
@@ -41,14 +41,14 @@ services:
       MAX_UPLOAD_SIZE: ${MAX_UPLOAD_SIZE}
       MAX_REQUEST_SIZE: ${MAX_REQUEST_SIZE}
       AI_ENGINE_BASE_URL: ${AI_ENGINE_BASE_URL}
-      ONLYOFFICE_DOCUMENT_SERVER_URL: ${ONLYOFFICE_DOCUMENT_SERVER_URL:-http://localhost:8082}
+      ONLYOFFICE_DOCUMENT_SERVER_URL: ${ONLYOFFICE_DOCUMENT_SERVER_URL:-https://bpmn-soft.duckdns.org}
       ONLYOFFICE_INTERNAL_DOCUMENT_SERVER_URL: ${ONLYOFFICE_INTERNAL_DOCUMENT_SERVER_URL:-http://onlyoffice}
       ONLYOFFICE_PRESIGNED_URL_HOURS: ${ONLYOFFICE_PRESIGNED_URL_HOURS:-2}
       JAVA_OPTS: ${JAVA_OPTS}
       FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH}
 
-    ports:
-      - "8080:8080"
+    expose:
+      - "8080"
     depends_on:
       bpmn-ai-engine:
         condition: service_healthy
@@ -67,8 +67,8 @@ services:
       USE_UNAUTHORIZED_STORAGE: "true"
       ALLOW_PRIVATE_IP_ADDRESS: "true"
       ALLOW_META_IP_ADDRESS: "true"
-    ports:
-      - "8082:80"
+    expose:
+      - "80"
     networks:
       - bpmn-net
 
@@ -90,8 +90,8 @@ services:
       AI_MODELS: ${AI_MODELS}
       AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS}
       AI_BASE_URL: ${AI_BASE_URL}
-    ports:
-      - "8010:8010"
+    expose:
+      - "8010"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8010/health', timeout=5)"]
       interval: ${AI_ENGINE_HEALTHCHECK_INTERVAL:-60s}
@@ -108,9 +108,10 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: ${SPRING_RABBITMQ_USERNAME}
       RABBITMQ_DEFAULT_PASS: ${SPRING_RABBITMQ_PASSWORD}
-    ports:
-      - "5672:5672"
-      - "15672:15672"
+    expose:
+      - "5672"
+      - "61613"
+      - "15672"
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
       interval: 10s

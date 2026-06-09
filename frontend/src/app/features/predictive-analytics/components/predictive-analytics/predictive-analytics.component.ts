@@ -1,6 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import {
+  DynamicReportPlan,
   PredictiveAnalysis,
   PredictionAnomaly,
   PredictionBottleneck,
@@ -12,7 +14,7 @@ import { PredictiveAnalyticsService } from '../../services/predictive-analytics.
 @Component({
   selector: 'app-predictive-analytics',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './predictive-analytics.component.html',
   styleUrl: './predictive-analytics.component.scss'
 })
@@ -23,6 +25,10 @@ export class PredictiveAnalyticsComponent implements OnInit {
   public analysis: PredictiveAnalysis | null = null;
   public loading = false;
   public message = '';
+  public reportPrompt = 'Quiero un reporte de los cuellos de botella de RRHH del ultimo mes en PDF';
+  public reportPlan: DynamicReportPlan | null = null;
+  public reportLoading = false;
+  public reportMessage = '';
 
   public async ngOnInit(): Promise<void> {
     await this.loadAnalysis();
@@ -42,6 +48,50 @@ export class PredictiveAnalyticsComponent implements OnInit {
       this.loading = false;
       this.cdr.detectChanges();
     }
+  }
+
+  public async prepareReport(): Promise<void> {
+    this.reportLoading = true;
+    this.reportMessage = '';
+    this.reportPlan = null;
+    this.cdr.detectChanges();
+
+    try {
+      this.reportPlan = await this.predictiveAnalyticsService.planDynamicReport(this.reportPrompt.trim());
+      this.reportMessage = this.reportPlan.complete
+        ? 'Solicitud completa. Ya puedes descargar el reporte.'
+        : this.reportPlan.question || 'El asistente necesita mas informacion para generar el reporte.';
+    } catch (error) {
+      this.reportMessage = error instanceof Error ? error.message : 'No se pudo preparar el reporte dinamico.';
+    } finally {
+      this.reportLoading = false;
+      this.cdr.detectChanges();
+    }
+  }
+
+  public async downloadReport(): Promise<void> {
+    this.reportLoading = true;
+    this.reportMessage = '';
+    this.cdr.detectChanges();
+
+    try {
+      await this.predictiveAnalyticsService.downloadDynamicReport(this.reportPrompt.trim());
+      this.reportMessage = 'Reporte generado y descargado correctamente.';
+    } catch (error) {
+      this.reportMessage = error instanceof Error ? error.message : 'No se pudo descargar el reporte dinamico.';
+    } finally {
+      this.reportLoading = false;
+      this.cdr.detectChanges();
+    }
+  }
+
+  public criteriaSummary(criteria?: Record<string, unknown>): string {
+    if (!criteria || Object.keys(criteria).length === 0) {
+      return 'Sin criterios detectados';
+    }
+    return Object.entries(criteria)
+      .map(([key, value]) => `${key}: ${value}`)
+      .join(' | ');
   }
 
   public get hasData(): boolean {

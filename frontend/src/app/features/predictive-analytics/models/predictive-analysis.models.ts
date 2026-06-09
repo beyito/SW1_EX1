@@ -51,3 +51,16 @@ export interface PredictiveAnalysis {
   bottlenecks: PredictionBottleneck[];
   warnings: string[];
 }
+
+export interface DynamicReportPlan {
+  complete: boolean;
+  missingFields: string[];
+  question: string;
+  dataScope: string;
+  criteria: Record<string, unknown>;
+  format: string;
+  title: string;
+  summary: string;
+  rows: Record<string, unknown>[];
+  warnings: string[];
+}

@@ -25,6 +25,67 @@
     </div>
   }
 
+  <section class="report-card">
+    <div class="report-header">
+      <div>
+        <span class="eyebrow">Fase 5 · Reportes dinámicos</span>
+        <h3>Agente analítico</h3>
+        <p>
+          Escribe una solicitud con datos, criterios y formato. Si falta algo, el asistente te pedirá
+          exactamente lo necesario antes de generar el archivo.
+        </p>
+      </div>
+    </div>
+
+    <label for="reportPrompt">Solicitud de reporte</label>
+    <textarea
+      id="reportPrompt"
+      [(ngModel)]="reportPrompt"
+      rows="3"
+      placeholder="Ej: Quiero un reporte de los cuellos de botella de RRHH del último mes en PDF">
+    </textarea>
+
+    <div class="report-actions">
+      <button type="button" (click)="prepareReport()" [disabled]="reportLoading || !reportPrompt.trim()">
+        {{ reportLoading ? 'Procesando...' : 'Validar solicitud' }}
+      </button>
+      <button
+        type="button"
+        class="secondary-action"
+        (click)="downloadReport()"
+        [disabled]="reportLoading || !reportPlan?.complete">
+        Descargar reporte
+      </button>
+    </div>
+
+    @if (reportMessage) {
+      <div class="alert" [ngClass]="reportPlan?.complete ? 'success' : 'warning'">
+        {{ reportMessage }}
+      </div>
+    }
+
+    @if (reportPlan) {
+      <div class="report-preview">
+        <article>
+          <span>Datos</span>
+          <strong>{{ reportPlan.dataScope || 'Pendiente' }}</strong>
+        </article>
+        <article>
+          <span>Criterios</span>
+          <strong>{{ criteriaSummary(reportPlan.criteria) }}</strong>
+        </article>
+        <article>
+          <span>Formato</span>
+          <strong>{{ reportPlan.format || 'Pendiente' }}</strong>
+        </article>
+        <article>
+          <span>Filas estimadas</span>
+          <strong>{{ reportPlan.rows.length }}</strong>
+        </article>
+      </div>
+    }
+  </section>
+
   @if (analysis) {
     <section class="summary-grid">
       <article>

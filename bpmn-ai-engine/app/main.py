@@ -4,7 +4,7 @@ import json
 import logging
 import re
 from difflib import SequenceMatcher
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List
 
 from fastapi import FastAPI, HTTPException, Request
@@ -145,6 +145,26 @@ class PredictiveAnalysisResponse(BaseModel):
     priorities: List[Dict[str, Any]] = Field(default_factory=list)
     route_predictions: List[Dict[str, Any]] = Field(default_factory=list)
     bottlenecks: List[Dict[str, Any]] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+
+
+class DynamicReportRequest(BaseModel):
+    prompt: str = Field(..., min_length=1)
+    processes: List[PredictiveProcessEvent] = Field(default_factory=list)
+    tasks: List[PredictiveTaskEvent] = Field(default_factory=list)
+    documents: List[PredictiveDocumentEvent] = Field(default_factory=list)
+
+
+class DynamicReportPlanResponse(BaseModel):
+    complete: bool
+    missing_fields: List[str] = Field(default_factory=list)
+    question: str = ""
+    data_scope: str = ""
+    criteria: Dict[str, Any] = Field(default_factory=dict)
+    format: str = ""
+    title: str = ""
+    summary: str = ""
+    rows: List[Dict[str, Any]] = Field(default_factory=list)
     warnings: List[str] = Field(default_factory=list)
 
 
@@ -422,6 +442,209 @@ def _predict_bottlenecks(tasks: List[PredictiveTaskEvent]) -> List[Dict[str, Any
     return bottlenecks
 
 
+def _strip_accents(value: str) -> str:
+    replacements = {
+        "á": "a",
+        "é": "e",
+        "í": "i",
+        "ó": "o",
+        "ú": "u",
+        "ñ": "n",
+        "ü": "u",
+    }
+    normalized = (value or "").lower()
+    for source, target in replacements.items():
+        normalized = normalized.replace(source, target)
+    return normalized
+
+
+def _detect_report_format(text: str) -> str:
+    normalized = _strip_accents(text)
+    if re.search(r"\b(pdf)\b", normalized):
+        return "pdf"
+    if re.search(r"\b(excel|xlsx|xls)\b", normalized):
+        return "excel"
+    if re.search(r"\b(csv)\b", normalized):
+        return "csv"
+    return ""
+
+
+def _detect_report_scope(text: str) -> str:
+    normalized = _strip_accents(text)
+    if "cuello" in normalized or "bottleneck" in normalized or "saturacion" in normalized:
+        return "bottlenecks"
+    if "anomalia" in normalized or "anomalo" in normalized or "fuera de patron" in normalized:
+        return "anomalies"
+    if "prioridad" in normalized or "critico" in normalized or "urgente" in normalized:
+        return "priorities"
+    if "ruta" in normalized or "siguiente paso" in normalized or "transicion" in normalized:
+        return "routes"
+    if "documento" in normalized or "archivo" in normalized:
+        return "documents"
+    if "tarea" in normalized:
+        return "tasks"
+    if "tramite" in normalized or "proceso" in normalized or "instancia" in normalized:
+        return "processes"
+    return ""
+
+
+def _detect_report_criteria(text: str) -> Dict[str, Any]:
+    normalized = _strip_accents(text)
+    criteria: Dict[str, Any] = {}
+    now = datetime.utcnow()
+
+    if "ultimo mes" in normalized or "ultimos 30 dias" in normalized:
+        criteria["period"] = "last_month"
+        criteria["from"] = (now - timedelta(days=30)).isoformat()
+        criteria["to"] = now.isoformat()
+    elif "ultima semana" in normalized or "ultimos 7 dias" in normalized:
+        criteria["period"] = "last_week"
+        criteria["from"] = (now - timedelta(days=7)).isoformat()
+        criteria["to"] = now.isoformat()
+    elif "hoy" in normalized:
+        criteria["period"] = "today"
+        criteria["from"] = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        criteria["to"] = now.isoformat()
+
+    stop_words = {
+        "los", "las", "el", "la", "un", "una", "unos", "unas", "ultimo", "ultimos",
+        "ultima", "ultimas", "cuellos", "cuello", "botella", "pdf", "excel", "csv", "reporte"
+    }
+    for lane_match in re.finditer(r"\b(?:de|del|en|area|carril)\s+([a-zA-ZáéíóúÁÉÍÓÚñÑ0-9_-]{2,})", text or "", re.IGNORECASE):
+        candidate = lane_match.group(1).strip(" .,;:")
+        if _strip_accents(candidate) not in stop_words:
+            criteria["lane"] = candidate
+
+    status_match = re.search(r"\b(pendientes?|completadas?|rechazadas?|activas?)\b", normalized)
+    if status_match:
+        criteria["status"] = status_match.group(1)
+
+    return criteria
+
+
+def _missing_report_fields(scope: str, criteria: Dict[str, Any], output_format: str) -> List[str]:
+    missing: List[str] = []
+    if not scope:
+        missing.append("datos")
+    if not criteria:
+        missing.append("criterios")
+    if not output_format:
+        missing.append("formato")
+    return missing
+
+
+def _report_question(missing: List[str]) -> str:
+    hints = {
+        "datos": "que datos quieres analizar (por ejemplo: cuellos de botella, anomalias, prioridades, rutas, documentos)",
+        "criterios": "con que criterios debo filtrar (por ejemplo: ultimo mes, RRHH, tareas pendientes)",
+        "formato": "en que formato lo necesitas (PDF, Excel o CSV)",
+    }
+    parts = [hints[field] for field in missing if field in hints]
+    return "Para generar el reporte necesito que indiques " + "; ".join(parts) + "."
+
+
+def _date_in_criteria(value: str | None, criteria: Dict[str, Any]) -> bool:
+    if not criteria.get("from") or not value:
+        return True
+    date_value = _parse_datetime(value)
+    date_from = _parse_datetime(str(criteria.get("from")))
+    date_to = _parse_datetime(str(criteria.get("to")))
+    if not date_value or not date_from or not date_to:
+        return True
+    return date_from <= date_value <= date_to
+
+
+def _matches_text_filter(value: str, expected: str | None) -> bool:
+    if not expected:
+        return True
+    return _strip_accents(expected) in _strip_accents(value)
+
+
+def _build_report_rows(scope: str, criteria: Dict[str, Any], payload: DynamicReportRequest) -> List[Dict[str, Any]]:
+    if scope == "bottlenecks":
+        rows = _predict_bottlenecks(payload.tasks)
+        lane = criteria.get("lane")
+        return [row for row in rows if _matches_text_filter(str(row.get("laneId", "")), lane)]
+
+    if scope == "anomalies":
+        task_anomalies, _ = _autoencoder_anomalies(payload.tasks)
+        rows = [*task_anomalies, *_document_burst_anomalies(payload.documents)]
+        lane = criteria.get("lane")
+        return [row for row in rows if _matches_text_filter(str(row.get("laneId", "")), lane)]
+
+    if scope == "priorities":
+        return _predict_priorities(payload.processes, payload.tasks)
+
+    if scope == "routes":
+        return _predict_routes(payload.tasks)
+
+    if scope == "documents":
+        return [
+            {
+                "processInstanceId": document.processInstanceId,
+                "policyId": document.policyId,
+                "documentId": document.documentId,
+                "createdBy": document.createdBy,
+                "createdAt": document.createdAt,
+                "size": document.size,
+            }
+            for document in payload.documents
+            if _date_in_criteria(document.createdAt, criteria)
+        ]
+
+    if scope == "tasks":
+        lane = criteria.get("lane")
+        status = criteria.get("status")
+        return [
+            {
+                "processInstanceId": task.processInstanceId,
+                "policyId": task.policyId,
+                "taskId": task.taskId,
+                "laneId": task.laneId,
+                "status": task.status,
+                "createdAt": task.createdAt,
+                "startedAt": task.startedAt,
+                "completedAt": task.completedAt,
+            }
+            for task in payload.tasks
+            if _matches_text_filter(task.laneId, lane)
+            and _matches_text_filter(task.status, status)
+            and _date_in_criteria(task.createdAt, criteria)
+        ]
+
+    return [
+        {
+            "processInstanceId": process.processInstanceId,
+            "policyId": process.policyId,
+            "title": process.title,
+            "status": process.status,
+            "startedBy": process.startedBy,
+            "startedAt": process.startedAt,
+            "completedAt": process.completedAt,
+        }
+        for process in payload.processes
+        if _date_in_criteria(process.startedAt, criteria)
+    ]
+
+
+def _report_title(scope: str, criteria: Dict[str, Any]) -> str:
+    labels = {
+        "bottlenecks": "Reporte de cuellos de botella",
+        "anomalies": "Reporte de anomalias",
+        "priorities": "Reporte de prioridades",
+        "routes": "Reporte de rutas probables",
+        "documents": "Reporte documental",
+        "tasks": "Reporte de tareas",
+        "processes": "Reporte de tramites",
+    }
+    title = labels.get(scope, "Reporte dinamico")
+    if criteria.get("lane"):
+        title += f" - {criteria['lane']}"
+    if criteria.get("period"):
+        title += f" ({criteria['period']})"
+    return title
+
+
 def _lexical_policy_match(text: str, policies: List[PolicyIntentCandidate]) -> PolicyIntentResponse:
     text_tokens = _tokenize(text)
     scored: List[PolicyIntentCandidateResponse] = []
@@ -595,6 +818,59 @@ def predictive_analysis(payload: PredictiveAnalysisRequest, http_request: Reques
         priorities=priorities,
         route_predictions=route_predictions,
         bottlenecks=bottlenecks,
+        warnings=warnings,
+    )
+
+
+@app.post("/api/v1/analytics/report-plan", response_model=DynamicReportPlanResponse)
+def dynamic_report_plan(payload: DynamicReportRequest, http_request: Request) -> DynamicReportPlanResponse:
+    request_id = http_request.headers.get("X-Request-Id", "").strip() or "n/a"
+    prompt = (payload.prompt or "").strip()
+    scope = _detect_report_scope(prompt)
+    output_format = _detect_report_format(prompt)
+    criteria = _detect_report_criteria(prompt)
+    missing = _missing_report_fields(scope, criteria, output_format)
+
+    logger.info(
+        "dynamic_report_plan request_id=%s complete=%s scope=%s format=%s criteria=%s",
+        request_id,
+        not missing,
+        scope,
+        output_format,
+        criteria,
+    )
+
+    if missing:
+        return DynamicReportPlanResponse(
+            complete=False,
+            missing_fields=missing,
+            question=_report_question(missing),
+            data_scope=scope,
+            criteria=criteria,
+            format=output_format,
+            title="Solicitud de reporte incompleta",
+            summary="El asistente necesita datos, criterios y formato antes de generar el archivo.",
+            rows=[],
+            warnings=[],
+        )
+
+    rows = _build_report_rows(scope, criteria, payload)
+    warnings: List[str] = []
+    if not TENSORFLOW_AVAILABLE and scope in {"anomalies", "priorities", "bottlenecks"}:
+        warnings.append("TensorFlow no esta instalado; el reporte usa calculos heurísticos donde aplica.")
+    if not rows:
+        warnings.append("No se encontraron registros para los criterios solicitados.")
+
+    return DynamicReportPlanResponse(
+        complete=True,
+        missing_fields=[],
+        question="",
+        data_scope=scope,
+        criteria=criteria,
+        format=output_format,
+        title=_report_title(scope, criteria),
+        summary=f"Se generaron {len(rows)} filas para el reporte solicitado.",
+        rows=rows,
         warnings=warnings,
     )
 
