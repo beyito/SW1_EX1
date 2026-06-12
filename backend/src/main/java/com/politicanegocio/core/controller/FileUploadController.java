@@ -50,6 +50,7 @@ public class FileUploadController {
                     file.getContentType(),
                     file.getSize(),
                     upload.getKey(),
+                    upload.getS3VersionId(),
                     currentUser
             );
             upload.setDocumentId(record.getId());

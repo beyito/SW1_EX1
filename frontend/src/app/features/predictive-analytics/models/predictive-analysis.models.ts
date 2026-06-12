@@ -25,12 +25,15 @@ export interface PredictionPriority {
 }
 
 export interface PredictionRoute {
+  policyId?: string;
+  policyName?: string;
   currentTaskId?: string;
   currentTaskLabel?: string;
   predictedNextTaskId?: string;
   predictedNextTaskLabel?: string;
   probability?: number;
   support?: number;
+  totalSimilarCases?: number;
   reason?: string;
 }
 

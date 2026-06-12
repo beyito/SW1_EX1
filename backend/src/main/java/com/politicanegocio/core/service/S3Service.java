@@ -10,6 +10,7 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
@@ -53,7 +54,7 @@ public class S3Service {
                 .contentType(file.getContentType())
                 .build();
 
-        s3Client.putObject(putObjectRequest, RequestBody.fromBytes(file.getBytes()));
+        PutObjectResponse putResponse = s3Client.putObject(putObjectRequest, RequestBody.fromBytes(file.getBytes()));
 
         var getObjectRequest = GetObjectRequest.builder()
                 .bucket(bucket)
@@ -66,7 +67,7 @@ public class S3Service {
                 .build();
 
         String url = s3Presigner.presignGetObject(presignedRequest).url().toString();
-        return new UploadResponseDto(key, url, file.getContentType(), file.getSize());
+        return new UploadResponseDto(key, url, file.getContentType(), file.getSize(), putResponse.versionId());
     }
 
     public String createPresignedReadUrl(String key) {
@@ -87,21 +88,44 @@ public class S3Service {
         return s3Presigner.presignGetObject(presignedRequest).url().toString();
     }
 
-    public void replaceObject(String key, byte[] content, String contentType) {
+    public String createPresignedReadUrl(String key, String versionId, Duration duration) {
+        GetObjectRequest.Builder getObjectRequest = GetObjectRequest.builder()
+                .bucket(bucket)
+                .key(key);
+        if (versionId != null && !versionId.isBlank()) {
+            getObjectRequest.versionId(versionId);
+        }
+
+        var presignedRequest = GetObjectPresignRequest.builder()
+                .signatureDuration(duration == null ? presignedDuration : duration)
+                .getObjectRequest(getObjectRequest.build())
+                .build();
+
+        return s3Presigner.presignGetObject(presignedRequest).url().toString();
+    }
+
+    public String replaceObject(String key, byte[] content, String contentType) {
         var putObjectRequest = PutObjectRequest.builder()
                 .bucket(bucket)
                 .key(key)
                 .contentType(contentType)
                 .build();
-        s3Client.putObject(putObjectRequest, RequestBody.fromBytes(content));
+        PutObjectResponse response = s3Client.putObject(putObjectRequest, RequestBody.fromBytes(content));
+        return response.versionId();
     }
 
     public byte[] getObjectBytes(String key) {
-        var getObjectRequest = GetObjectRequest.builder()
+        return getObjectBytes(key, null);
+    }
+
+    public byte[] getObjectBytes(String key, String versionId) {
+        GetObjectRequest.Builder getObjectRequest = GetObjectRequest.builder()
                 .bucket(bucket)
-                .key(key)
-                .build();
-        ResponseBytes<GetObjectResponse> objectBytes = s3Client.getObjectAsBytes(getObjectRequest);
+                .key(key);
+        if (versionId != null && !versionId.isBlank()) {
+            getObjectRequest.versionId(versionId);
+        }
+        ResponseBytes<GetObjectResponse> objectBytes = s3Client.getObjectAsBytes(getObjectRequest.build());
         return objectBytes.asByteArray();
     }
 

@@ -76,12 +76,14 @@ export interface ProcessTaskGroupDto {
 export interface TaskFormField {
   id?: string;
   name?: string;
-  type: 'text' | 'number' | 'select' | 'checkbox' | 'boolean' | 'date' | 'textarea' | 'file';
+  type: 'text' | 'number' | 'select' | 'checkbox' | 'boolean' | 'date' | 'textarea' | 'file' | 'grid';
   label: string;
   required?: boolean;
   requiresAttachment?: boolean;
   attachmentLabel?: string;
   options?: string[];
+  gridColumns?: string[];
+  gridRows?: number;
   placeholder?: string;
 }
 
@@ -109,6 +111,8 @@ export interface DocumentDto {
   url: string;
   createdAt?: string;
   updatedAt?: string;
+  currentVersionNumber?: number;
+  currentS3VersionId?: string;
   canEdit?: boolean;
   canDelete?: boolean;
 }
@@ -116,4 +120,18 @@ export interface DocumentDto {
 export interface OnlyOfficeConfigDto {
   documentServerUrl: string;
   config: Record<string, unknown>;
+}
+
+export interface DocumentVersionDto {
+  id: string;
+  documentId: string;
+  versionNumber: number;
+  fileName: string;
+  contentType: string;
+  size: number;
+  s3VersionId?: string | null;
+  createdBy?: string | null;
+  source?: string | null;
+  createdAt?: string | null;
+  restorable: boolean;
 }

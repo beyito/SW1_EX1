@@ -1,6 +1,7 @@
 package com.politicanegocio.core.controller;
 
 import com.politicanegocio.core.dto.DocumentDto;
+import com.politicanegocio.core.dto.DocumentVersionDto;
 import com.politicanegocio.core.model.User;
 import com.politicanegocio.core.service.DocumentService;
 import org.springframework.http.ResponseEntity;
@@ -8,6 +9,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -33,6 +35,23 @@ public class DocumentController {
             Authentication authentication
     ) {
         return ResponseEntity.ok(documentService.getDocumentsForProcess(processInstanceId, currentUser(authentication)));
+    }
+
+    @GetMapping("/{documentId}/versions")
+    public ResponseEntity<List<DocumentVersionDto>> getDocumentVersions(
+            @PathVariable String documentId,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(documentService.listVersions(documentId, currentUser(authentication)));
+    }
+
+    @PostMapping("/{documentId}/versions/{versionNumber}/restore")
+    public ResponseEntity<DocumentDto> restoreDocumentVersion(
+            @PathVariable String documentId,
+            @PathVariable int versionNumber,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(documentService.restoreVersion(documentId, versionNumber, currentUser(authentication)));
     }
 
     @DeleteMapping("/{documentId}")

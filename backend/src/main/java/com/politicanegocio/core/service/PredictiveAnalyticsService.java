@@ -42,6 +42,7 @@ public class PredictiveAnalyticsService {
     private final ProcessInstanceRepository processInstanceRepository;
     private final TaskInstanceRepository taskInstanceRepository;
     private final DocumentRecordRepository documentRecordRepository;
+    private final WorkflowEngine workflowEngine;
 
     public PredictiveAnalyticsService(
             @Value("${app.ai-engine.base-url:http://127.0.0.1:8010}") String aiEngineBaseUrl,
@@ -49,7 +50,8 @@ public class PredictiveAnalyticsService {
             PolicyRepository policyRepository,
             ProcessInstanceRepository processInstanceRepository,
             TaskInstanceRepository taskInstanceRepository,
-            DocumentRecordRepository documentRecordRepository
+            DocumentRecordRepository documentRecordRepository,
+            WorkflowEngine workflowEngine
     ) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(15000);
@@ -63,6 +65,7 @@ public class PredictiveAnalyticsService {
         this.processInstanceRepository = processInstanceRepository;
         this.taskInstanceRepository = taskInstanceRepository;
         this.documentRecordRepository = documentRecordRepository;
+        this.workflowEngine = workflowEngine;
     }
 
     public PredictiveAnalysisResponseDto analyze(User user) {
@@ -258,8 +261,15 @@ public class PredictiveAnalyticsService {
         response.anomalies().forEach(item -> enrichCommon(item, policyNames, processTitles, documentNames, laneNames));
         response.bottlenecks().forEach(item -> enrichCommon(item, policyNames, processTitles, documentNames, laneNames));
         response.routePredictions().forEach(item -> {
-            item.put("currentTaskLabel", humanizeIdentifier(asString(item.get("currentTaskId")), "Paso actual"));
-            item.put("predictedNextTaskLabel", humanizeIdentifier(asString(item.get("predictedNextTaskId")), "Siguiente paso"));
+            String policyId = asString(item.get("policyId"));
+            String currentTaskId = firstNonBlank(asString(item.get("currentTaskId")), asString(item.get("taskId")));
+            String nextTaskId = asString(item.get("predictedNextTaskId"));
+            item.put("currentTaskId", currentTaskId);
+            item.put("currentTaskLabel", resolveTaskLabel(policyId, currentTaskId, "Paso actual"));
+            item.put("predictedNextTaskLabel", resolveTaskLabel(policyId, nextTaskId, "Siguiente paso"));
+            if (!policyId.isBlank()) {
+                item.put("policyName", policyNames.getOrDefault(policyId, "Trámite sin nombre"));
+            }
         });
         return response;
     }
@@ -300,6 +310,20 @@ public class PredictiveAnalyticsService {
 
     private String readable(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private String resolveTaskLabel(String policyId, String taskId, String fallback) {
+        if (!policyId.isBlank() && !taskId.isBlank()) {
+            String nodeName = workflowEngine.getNodeName(policyId, taskId);
+            if (nodeName != null && !nodeName.isBlank()) {
+                return nodeName;
+            }
+        }
+        return humanizeIdentifier(taskId, fallback);
+    }
+
+    private String firstNonBlank(String first, String second) {
+        return first == null || first.isBlank() ? second : first;
     }
 
     private String humanizeIdentifier(String value, String fallback) {

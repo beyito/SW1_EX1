@@ -133,6 +133,11 @@ export class PredictiveAnalyticsComponent implements OnInit {
     return `${Math.round(normalized)}%`;
   }
 
+  public similarCasesLabel(value?: number): string {
+    const cases = typeof value === 'number' && !Number.isNaN(value) ? value : 0;
+    return cases === 1 ? '1 caso similar' : `${cases} casos similares`;
+  }
+
   public modelStrategyLabel(strategy?: string): string {
     if (strategy === 'tensorflow_autoencoder') {
       return 'Autoencoder TensorFlow';

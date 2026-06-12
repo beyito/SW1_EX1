@@ -91,6 +91,8 @@ export class PolicyDesignerComponent implements OnInit, AfterViewInit, OnDestroy
   public newFieldLabel = '';
   public newFieldType: FormField['type'] = 'text';
   public newFieldOptions = '';
+  public newFieldGridColumns = '';
+  public newFieldGridRows = 3;
   public newFieldRequired = false;
   public newFieldRequiresAttachment = false;
   public newFieldAttachmentLabel = '';
@@ -927,6 +929,13 @@ private showLinkTools(linkView: dia.LinkView): void {
     const options = this.newFieldType === 'select' || this.newFieldType === 'checkbox'
       ? this.newFieldOptions.split(',').map(opt => opt.trim()).filter(opt => opt)
       : undefined;
+    const gridColumns = this.newFieldType === 'grid'
+      ? this.newFieldGridColumns.split(',').map(column => column.trim()).filter(column => column)
+      : undefined;
+    if (this.newFieldType === 'grid' && (!gridColumns || gridColumns.length === 0)) {
+      this.infoMessage = 'Agrega al menos una columna para la cuadrícula.';
+      return;
+    }
 
     const normalizedAttachmentLabel = this.newFieldRequiresAttachment
       ? (this.newFieldAttachmentLabel?.trim() || 'Adjunto requerido')
@@ -941,6 +950,8 @@ private showLinkTools(linkView: dia.LinkView): void {
       placeholder: '',
       required: this.newFieldRequired,
       options,
+      gridColumns,
+      gridRows: this.newFieldType === 'grid' ? Math.max(1, Number(this.newFieldGridRows) || 1) : undefined,
       requiresAttachment: this.newFieldRequiresAttachment,
       attachmentLabel: normalizedAttachmentLabel
     };
@@ -970,6 +981,8 @@ private showLinkTools(linkView: dia.LinkView): void {
     this.newFieldLabel = '';
     this.newFieldType = 'text';
     this.newFieldOptions = '';
+    this.newFieldGridColumns = '';
+    this.newFieldGridRows = 3;
     this.newFieldRequired = false;
     this.newFieldRequiresAttachment = false;
     this.newFieldAttachmentLabel = '';
@@ -981,14 +994,15 @@ private showLinkTools(linkView: dia.LinkView): void {
   }
 
   public getFieldTypeLabel(type: FormField['type']): string {
-    const labels = {
+    const labels: Record<FormField['type'], string> = {
       text: 'Texto',
       textarea: 'Texto largo',
       number: 'Número',
       date: 'Fecha',
       select: 'Selección',
       checkbox: 'Múltiple',
-      file: 'Archivo'
+      file: 'Archivo',
+      grid: 'Cuadrícula'
     };
     return labels[type] || type;
   }
@@ -1027,6 +1041,8 @@ private showLinkTools(linkView: dia.LinkView): void {
     this.newFieldRequiresAttachment = !!field.requiresAttachment;
     this.newFieldAttachmentLabel = field.attachmentLabel ?? '';
     this.newFieldOptions = Array.isArray(field.options) ? field.options.join(', ') : '';
+    this.newFieldGridColumns = Array.isArray(field.gridColumns) ? field.gridColumns.join(', ') : '';
+    this.newFieldGridRows = field.gridRows ?? 3;
     this.isFormDesignerOpen = true;
     this.infoMessage = `Editando pregunta "${field.label}".`;
   }
@@ -1905,4 +1921,3 @@ private showLinkTools(linkView: dia.LinkView): void {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 }
-

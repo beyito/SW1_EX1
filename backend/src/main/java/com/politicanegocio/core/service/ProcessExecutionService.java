@@ -887,6 +887,24 @@ public class ProcessExecutionService {
             return valueNode.isMissingNode() || valueNode.isNull();
         }
 
+        if ("grid".equalsIgnoreCase(fieldType)) {
+            if (!valueNode.isArray() || valueNode.isEmpty()) {
+                return true;
+            }
+            for (JsonNode row : valueNode) {
+                if (row != null && row.isObject()) {
+                    var fields = row.fields();
+                    while (fields.hasNext()) {
+                        JsonNode cell = fields.next().getValue();
+                        if (cell != null && !cell.isNull() && !cell.asText("").trim().isEmpty()) {
+                            return false;
+                        }
+                    }
+                }
+            }
+            return true;
+        }
+
         if (valueNode.isTextual()) {
             return valueNode.asText("").trim().isEmpty();
         }

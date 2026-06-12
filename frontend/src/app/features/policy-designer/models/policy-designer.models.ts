@@ -32,11 +32,13 @@ export interface Attachment {
 
 export interface FormField {
   id: string;
-  type: 'text' | 'number' | 'textarea' | 'select' | 'checkbox' | 'date' | 'file';
+  type: 'text' | 'number' | 'textarea' | 'select' | 'checkbox' | 'date' | 'file' | 'grid';
   label: string;
   placeholder?: string;
   required: boolean;
   options?: string[]; // Para select y checkbox
+  gridColumns?: string[];
+  gridRows?: number;
   requiresAttachment?: boolean;
   attachmentLabel?: string;
 }

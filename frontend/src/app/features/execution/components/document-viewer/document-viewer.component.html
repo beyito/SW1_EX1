@@ -11,7 +11,7 @@
         <p class="eyebrow">Documento DMS</p>
         <h2>{{ document.fileName }}</h2>
         <p>{{ document.contentType || 'Documento' }}</p>
-        <small>{{ document.size | number }} bytes</small>
+        <small>{{ document.size | number }} bytes · Versión actual: {{ document.currentVersionNumber || 1 }}</small>
       </div>
 
       <div class="toolbar-actions">
@@ -27,6 +27,41 @@
     <section class="document-placeholder">
       <h3>Vista previa no intrusiva</h3>
       <p>Este panel no descarga automáticamente el archivo. Para modificarlo, inicia una sesión de edición colaborativa.</p>
+    </section>
+
+    <section class="versions-card">
+      <header>
+        <div>
+          <p class="eyebrow">Historial</p>
+          <h3>Versiones del documento</h3>
+        </div>
+        <button class="btn" type="button" (click)="loadVersions()" [disabled]="versionsLoading">
+          {{ versionsLoading ? 'Actualizando...' : 'Actualizar' }}
+        </button>
+      </header>
+
+      @if (versions.length === 0) {
+        <p class="empty-state">Aún no hay versiones registradas para este documento.</p>
+      } @else {
+        <div class="versions-list">
+          @for (version of versions; track version.id) {
+            <article class="version-row">
+              <div>
+                <strong>Versión {{ version.versionNumber }}</strong>
+                <span>{{ version.size | number }} bytes · {{ version.source || 'SYSTEM' }}</span>
+                <small>{{ version.createdAt || 'Sin fecha' }} · {{ version.createdBy || 'system' }}</small>
+              </div>
+              <button
+                class="btn btn-primary"
+                type="button"
+                (click)="restoreVersion(version)"
+                [disabled]="!document.canEdit || !version.restorable || restoringVersion === version.versionNumber">
+                {{ restoringVersion === version.versionNumber ? 'Restaurando...' : 'Restaurar' }}
+              </button>
+            </article>
+          }
+        </div>
+      }
     </section>
   }
 

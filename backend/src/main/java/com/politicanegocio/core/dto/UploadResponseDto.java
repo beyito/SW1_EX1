@@ -7,6 +7,7 @@ public class UploadResponseDto {
     private String url;
     private String contentType;
     private long size;
+    private String s3VersionId;
 
     public UploadResponseDto() {
     }
@@ -16,6 +17,14 @@ public class UploadResponseDto {
         this.url = url;
         this.contentType = contentType;
         this.size = size;
+    }
+
+    public UploadResponseDto(String key, String url, String contentType, long size, String s3VersionId) {
+        this.key = key;
+        this.url = url;
+        this.contentType = contentType;
+        this.size = size;
+        this.s3VersionId = s3VersionId;
     }
 
     public UploadResponseDto(String key, String documentId, String url, String contentType, long size) {
@@ -64,5 +73,13 @@ public class UploadResponseDto {
 
     public void setSize(long size) {
         this.size = size;
+    }
+
+    public String getS3VersionId() {
+        return s3VersionId;
+    }
+
+    public void setS3VersionId(String s3VersionId) {
+        this.s3VersionId = s3VersionId;
     }
 }

@@ -3,6 +3,7 @@ import { AuthService } from '../../../auth.service';
 import {
   PendingTaskDto,
   DocumentDto,
+  DocumentVersionDto,
   OnlyOfficeConfigDto,
   ProcessTaskGroupDto,
   ProcessInstance,
@@ -214,9 +215,41 @@ export class ExecutionService {
     return response.json();
   }
 
+  public async getDocumentVersions(documentId: string): Promise<DocumentVersionDto[]> {
+    const response = await fetch(`/api/documents/${encodeURIComponent(documentId)}/versions`, {
+      headers: this.authHeaders
+    });
+
+    if (!response.ok) {
+      throw new Error(await this.readDocumentError(response, 'No se pudieron cargar las versiones del documento'));
+    }
+
+    return response.json();
+  }
+
+  public async restoreDocumentVersion(documentId: string, versionNumber: number): Promise<DocumentDto> {
+    const response = await fetch(`/api/documents/${encodeURIComponent(documentId)}/versions/${versionNumber}/restore`, {
+      method: 'POST',
+      headers: this.authHeaders
+    });
+
+    if (!response.ok) {
+      throw new Error(await this.readDocumentError(response, 'No se pudo restaurar la versión seleccionada'));
+    }
+
+    return response.json();
+  }
+
   private async readDocumentError(response: Response, fallback: string): Promise<string> {
     if (response.status === 403) {
-      return 'No tienes privilegios suficientes para realizar esta acción sobre el documento. Solicita acceso al administrador de empresa.';
+      const raw = await response.text();
+      const parsed = this.extractErrorMessage(raw);
+      return parsed || 'No tienes privilegios suficientes para realizar esta acción sobre el documento. Si estás restaurando una versión, verifica permisos documentales y permisos s3:GetObjectVersion en AWS.';
+    }
+    if (response.status === 409) {
+      const raw = await response.text();
+      const parsed = this.extractErrorMessage(raw);
+      return parsed || 'Esta versión no se puede restaurar. Verifica que el bucket S3 tenga versionamiento activo.';
     }
     if (response.status === 404) {
       return 'El documento no existe o ya no está disponible.';
@@ -229,6 +262,9 @@ export class ExecutionService {
   private extractErrorMessage(raw: string): string {
     const text = (raw ?? '').trim();
     if (!text) {
+      return '';
+    }
+    if (text.startsWith('<!DOCTYPE html') || text.startsWith('<html') || text.includes('Whitelabel Error Page')) {
       return '';
     }
     try {

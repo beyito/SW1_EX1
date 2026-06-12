@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { ActivatedRoute, RouterModule } from '@angular/router';
-import { DocumentDto, OnlyOfficeConfigDto } from '../../models/execution.models';
+import { DocumentDto, DocumentVersionDto, OnlyOfficeConfigDto } from '../../models/execution.models';
 import { ExecutionService } from '../../services/execution.service';
 
 declare global {
@@ -28,6 +28,9 @@ export class DocumentViewerComponent implements OnInit {
   public loading = false;
   public onlyOfficeLoading = false;
   public onlyOfficeOpen = false;
+  public versions: DocumentVersionDto[] = [];
+  public versionsLoading = false;
+  public restoringVersion: number | null = null;
   public message = '';
 
   public ngOnInit(): void {
@@ -100,11 +103,52 @@ export class DocumentViewerComponent implements OnInit {
     this.cdr.detectChanges();
     try {
       this.document = await this.executionService.getDocument(documentId);
+      await this.loadVersions(documentId);
       this.tryOpenEditorFromQueryParam();
     } catch (error) {
       this.message = error instanceof Error ? error.message : 'No se pudo cargar el documento.';
     } finally {
       this.loading = false;
+      this.cdr.detectChanges();
+    }
+  }
+
+  public async loadVersions(documentId = this.document?.id ?? ''): Promise<void> {
+    if (!documentId) {
+      return;
+    }
+    this.versionsLoading = true;
+    this.cdr.detectChanges();
+    try {
+      this.versions = await this.executionService.getDocumentVersions(documentId);
+    } catch (error) {
+      this.message = error instanceof Error ? error.message : 'No se pudieron cargar las versiones.';
+    } finally {
+      this.versionsLoading = false;
+      this.cdr.detectChanges();
+    }
+  }
+
+  public async restoreVersion(version: DocumentVersionDto): Promise<void> {
+    if (!this.document || !this.document.canEdit || !version.restorable) {
+      this.message = 'No puedes restaurar esta versión del documento.';
+      return;
+    }
+    if (!confirm(`¿Restaurar la versión ${version.versionNumber} de este documento?`)) {
+      return;
+    }
+
+    this.restoringVersion = version.versionNumber;
+    this.message = '';
+    this.cdr.detectChanges();
+    try {
+      this.document = await this.executionService.restoreDocumentVersion(this.document.id, version.versionNumber);
+      await this.loadVersions(this.document.id);
+      this.message = `Se restauró la versión ${version.versionNumber}.`;
+    } catch (error) {
+      this.message = error instanceof Error ? error.message : 'No se pudo restaurar la versión.';
+    } finally {
+      this.restoringVersion = null;
       this.cdr.detectChanges();
     }
   }

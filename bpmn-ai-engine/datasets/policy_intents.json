@@ -1,0 +1,263 @@
+[
+  {
+    "policy_id": "reposicion_tarjeta",
+    "examples": [
+      "perdi mi tarjeta y necesito otra",
+      "me robaron la tarjeta",
+      "quiero reponer mi tarjeta",
+      "mi tarjeta desaparecio",
+      "bloquear tarjeta robada y sacar nueva",
+      "necesito una nueva tarjeta por extravio",
+      "la tarjeta fue retenida y necesito reemplazo",
+      "solicito reposicion de tarjeta",
+      "mi plastico se perdio",
+      "quiero sacar otra tarjeta bancaria",
+      "tarjeta extraviada",
+      "me hurtaron la tarjeta"
+    ],
+    "missing_requirements": [
+      "Carnet de Identidad",
+      "Denuncia o declaracion de extravio"
+    ]
+  },
+  {
+    "policy_id": "renovacion_tarjeta",
+    "examples": [
+      "renovar tarjeta vencida",
+      "mi tarjeta ya expiro",
+      "quiero cambiar mi tarjeta por vencimiento",
+      "necesito renovar mi tarjeta",
+      "la tarjeta vence este mes",
+      "actualizar tarjeta caducada",
+      "renovacion de plastico",
+      "mi tarjeta antigua ya no sirve",
+      "solicito nueva tarjeta por fecha vencida",
+      "tarjeta por vencer",
+      "cambio de tarjeta vencida",
+      "emitir tarjeta renovada"
+    ],
+    "missing_requirements": [
+      "Carnet de Identidad",
+      "Tarjeta vencida"
+    ]
+  },
+  {
+    "policy_id": "solicitud_credito",
+    "examples": [
+      "necesito solicitar un credito",
+      "quiero un prestamo",
+      "busco financiamiento para mi negocio",
+      "solicitud de credito urgente",
+      "quiero credito para capital de trabajo",
+      "necesito dinero financiado",
+      "prestamo para comprar maquinaria",
+      "credito para ampliar mi negocio",
+      "requiero financiamiento personal",
+      "quiero evaluar un prestamo",
+      "pedir credito empresarial",
+      "necesito aprobacion de credito"
+    ],
+    "missing_requirements": [
+      "Carnet de Identidad",
+      "Comprobante de ingresos",
+      "Extracto bancario"
+    ]
+  },
+  {
+    "policy_id": "reclamo_servicio",
+    "examples": [
+      "quiero presentar un reclamo",
+      "me atendieron mal",
+      "el servicio fallo",
+      "tengo que quejarme por mala atencion",
+      "hubo un error en el servicio",
+      "quiero reclamar por cobro incorrecto",
+      "no resolvieron mi solicitud",
+      "necesito reportar una mala experiencia",
+      "el tramite tuvo demora injustificada",
+      "quiero levantar queja",
+      "servicio deficiente",
+      "reclamo por incumplimiento"
+    ],
+    "missing_requirements": [
+      "Documento de respaldo",
+      "Descripcion del incidente"
+    ]
+  },
+  {
+    "policy_id": "licencia_funcionamiento",
+    "examples": [
+      "quiero abrir un negocio",
+      "necesito licencia de funcionamiento",
+      "permiso para operar mi local",
+      "tramite para habilitar comercio",
+      "abrir una tienda",
+      "habilitar mi restaurante",
+      "licencia para actividad comercial",
+      "autorizacion para local comercial",
+      "permiso municipal de funcionamiento",
+      "quiero legalizar mi negocio",
+      "documentos para funcionar como empresa",
+      "registrar actividad economica"
+    ],
+    "missing_requirements": [
+      "NIT",
+      "Croquis",
+      "Carnet de Identidad",
+      "Contrato de alquiler o propiedad"
+    ]
+  },
+  {
+    "policy_id": "certificado_solvencia",
+    "examples": [
+      "necesito certificado de solvencia",
+      "quiero demostrar que no tengo deudas",
+      "solicito solvencia",
+      "certificado de no adeudo",
+      "constancia de deuda cero",
+      "documento que certifique que estoy al dia",
+      "necesito comprobar mis pagos",
+      "sacar certificado financiero",
+      "constancia de solvencia economica",
+      "requiero certificado para tramite",
+      "quiero validar que no debo nada",
+      "certificacion de pagos al dia"
+    ],
+    "missing_requirements": [
+      "Carnet de Identidad",
+      "Numero de cuenta o registro"
+    ]
+  },
+  {
+    "policy_id": "cambio_datos_cliente",
+    "examples": [
+      "quiero cambiar mis datos",
+      "actualizar mi direccion",
+      "modificar mi telefono",
+      "corregir mi nombre",
+      "actualizar correo electronico",
+      "cambiar datos personales",
+      "editar informacion de cliente",
+      "registrar nuevo domicilio",
+      "cambio de numero celular",
+      "corregir mis datos registrados",
+      "actualizacion de datos",
+      "modificar informacion de contacto"
+    ],
+    "missing_requirements": [
+      "Carnet de Identidad",
+      "Respaldo del dato a modificar"
+    ]
+  },
+  {
+    "policy_id": "devolucion_pago",
+    "examples": [
+      "quiero devolucion de pago",
+      "pague dos veces",
+      "me cobraron de mas",
+      "solicito reembolso",
+      "devolver dinero cobrado",
+      "tengo pago duplicado",
+      "quiero recuperar un pago incorrecto",
+      "reclamar devolucion de dinero",
+      "reembolso por cobro errado",
+      "devolucion por transaccion duplicada",
+      "pago equivocado",
+      "anular cobro y devolver dinero"
+    ],
+    "missing_requirements": [
+      "Comprobante de pago",
+      "Carnet de Identidad",
+      "Cuenta de devolucion"
+    ]
+  },
+  {
+    "policy_id": "autorizacion_viaje_menor",
+    "examples": [
+      "autorizacion para viaje de menor",
+      "mi hijo necesita permiso de viaje",
+      "permiso para que viaje un menor",
+      "autorizar salida de menor",
+      "documento para viaje de mi hija",
+      "necesito permiso notarial de viaje",
+      "viaje de menor al exterior",
+      "tramite para menor viajando",
+      "autorizar viaje escolar",
+      "permiso de padres para viaje",
+      "menor debe viajar con familiar",
+      "solicitar autorizacion de viaje"
+    ],
+    "missing_requirements": [
+      "Carnet de Identidad del tutor",
+      "Certificado de nacimiento",
+      "Itinerario de viaje"
+    ]
+  },
+  {
+    "policy_id": "permiso_construccion",
+    "examples": [
+      "necesito permiso de construccion",
+      "quiero construir en mi terreno",
+      "autorizacion para obra",
+      "licencia de construccion",
+      "permiso para ampliar mi casa",
+      "tramite para edificar",
+      "aprobar planos de construccion",
+      "construccion de vivienda",
+      "permiso para remodelacion",
+      "autorizacion municipal de obra",
+      "quiero levantar una construccion",
+      "habilitar proyecto de obra"
+    ],
+    "missing_requirements": [
+      "Plano aprobado",
+      "Documento de propiedad",
+      "Carnet de Identidad"
+    ]
+  },
+  {
+    "policy_id": "beca_estudiantil",
+    "examples": [
+      "quiero solicitar una beca",
+      "necesito ayuda estudiantil",
+      "postular a beca",
+      "beca para estudios",
+      "apoyo economico para estudiar",
+      "solicitud de beca universitaria",
+      "quiero financiamiento academico",
+      "ayuda para pagar estudios",
+      "beca por rendimiento",
+      "beca socioeconomica",
+      "postulacion estudiantil",
+      "beneficio para estudiante"
+    ],
+    "missing_requirements": [
+      "Carnet de Identidad",
+      "Certificado de notas",
+      "Comprobante socioeconomico"
+    ]
+  },
+  {
+    "policy_id": "registro_proveedor",
+    "examples": [
+      "quiero registrarme como proveedor",
+      "alta de proveedor",
+      "inscribir mi empresa para vender servicios",
+      "registro para proveedor",
+      "quiero ofrecer productos a la empresa",
+      "habilitar proveedor",
+      "registro de empresa proveedora",
+      "ser proveedor autorizado",
+      "inscripcion en padron de proveedores",
+      "postular como proveedor",
+      "registrar datos de proveedor",
+      "alta comercial de proveedor"
+    ],
+    "missing_requirements": [
+      "NIT",
+      "Matricula de comercio",
+      "Cuenta bancaria",
+      "Representante legal"
+    ]
+  }
+]

@@ -162,10 +162,11 @@
         } @else {
           @for (route of analysis.routePredictions; track trackRoute($index, route)) {
             <div class="route-row">
+              <small>{{ route.policyName || 'Trámite' }}</small>
               <strong>{{ route.currentTaskLabel || 'Paso actual' }}</strong>
               <span>→</span>
               <strong>{{ route.predictedNextTaskLabel || 'Siguiente paso' }}</strong>
-              <small>{{ asPercent(route.probability) }} de probabilidad · {{ route.support || 0 }} casos similares</small>
+              <small>{{ asPercent(route.probability) }} de probabilidad · {{ similarCasesLabel(route.support) }}</small>
             </div>
           }
         }

@@ -1,6 +1,6 @@
 ﻿import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
-import { FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, FormControl, FormGroup, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ExecutionService } from '../../services/execution.service';
 import { TaskDetailDto, TaskFormField, TaskStatus } from '../../models/execution.models';
@@ -267,16 +267,102 @@ export class TaskExecutionComponent implements OnInit {
       // required clásico o requerimiento explícito de adjunto
       const isRequired = (field.required ?? false) || (field.requiresAttachment ?? false);
       const isBooleanField = field.type === 'checkbox' || field.type === 'boolean';
+      const initialValue = field.type === 'grid'
+        ? this.createGridRows(field)
+        : (isBooleanField ? false : '');
 
       controls[controlName] = this.fb.control(
-        isBooleanField ? false : '',
+        initialValue,
         isRequired
-          ? [isBooleanField ? Validators.requiredTrue : Validators.required]
+          ? [isBooleanField ? Validators.requiredTrue : this.requiredGridAwareValidator(field.type)]
           : []
       ) as FormControl;
     });
 
     return this.fb.group(controls) as DynamicFormGroup;
+  }
+
+  public gridColumns(field: TaskFormField): string[] {
+    return Array.isArray(field.gridColumns) && field.gridColumns.length > 0
+      ? field.gridColumns
+      : ['Columna 1'];
+  }
+
+  public gridRows(field: TaskFormField, index: number): Array<Record<string, unknown>> {
+    const value = this.getFieldControl(field, index)?.value;
+    return Array.isArray(value) ? value as Array<Record<string, unknown>> : [];
+  }
+
+  public updateGridCell(field: TaskFormField, index: number, rowIndex: number, column: string, value: string): void {
+    const control = this.getFieldControl(field, index);
+    if (!control) {
+      return;
+    }
+    const rows = Array.isArray(control.value) ? [...control.value] : this.createGridRows(field);
+    rows[rowIndex] = {
+      ...(rows[rowIndex] ?? {}),
+      [column]: value
+    };
+    control.setValue(rows);
+    control.markAsDirty();
+    control.updateValueAndValidity();
+  }
+
+  public addGridRow(field: TaskFormField, index: number): void {
+    const control = this.getFieldControl(field, index);
+    if (!control) {
+      return;
+    }
+    const rows = Array.isArray(control.value) ? [...control.value] : [];
+    rows.push(this.emptyGridRow(field));
+    control.setValue(rows);
+    control.markAsDirty();
+  }
+
+  public removeGridRow(field: TaskFormField, index: number, rowIndex: number): void {
+    const control = this.getFieldControl(field, index);
+    if (!control) {
+      return;
+    }
+    const rows = Array.isArray(control.value) ? [...control.value] : [];
+    if (rows.length <= 1) {
+      control.setValue([this.emptyGridRow(field)]);
+    } else {
+      rows.splice(rowIndex, 1);
+      control.setValue(rows);
+    }
+    control.markAsDirty();
+    control.updateValueAndValidity();
+  }
+
+  public formatAnswer(field: TaskFormField, value: unknown): string {
+    if (field.type === 'grid') {
+      return JSON.stringify(value ?? [], null, 2);
+    }
+    return String(value ?? 'Sin respuesta');
+  }
+
+  private createGridRows(field: TaskFormField): Array<Record<string, string>> {
+    const rowCount = Math.max(1, Number(field.gridRows) || 1);
+    return Array.from({ length: rowCount }, () => this.emptyGridRow(field));
+  }
+
+  private emptyGridRow(field: TaskFormField): Record<string, string> {
+    return this.gridColumns(field).reduce((row, column) => {
+      row[column] = '';
+      return row;
+    }, {} as Record<string, string>);
+  }
+
+  private requiredGridAwareValidator(fieldType: string): (control: AbstractControl) => ValidationErrors | null {
+    return (control: AbstractControl): ValidationErrors | null => {
+      if (fieldType !== 'grid') {
+        return Validators.required(control);
+      }
+      const rows = Array.isArray(control.value) ? control.value : [];
+      const hasValue = rows.some((row) => row && Object.values(row).some((value) => String(value ?? '').trim().length > 0));
+      return hasValue ? null : { required: true };
+    };
   }
 
   private parseSchema(rawSchema: string): TaskFormField[] {

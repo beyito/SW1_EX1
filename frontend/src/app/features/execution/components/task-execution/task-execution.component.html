@@ -61,7 +61,7 @@
         </div>
 
         <form [formGroup]="formGroup" class="dynamic-form" (ngSubmit)="submitTask()">
-          @for (field of formSchemaFields; track fieldName(field, $index)) {
+          @for (field of formSchemaFields; track fieldName(field, $index); let fieldIndex = $index) {
             <div class="form-field">
               <label [for]="fieldName(field, $index)">
                 {{ field.label }}
@@ -110,6 +110,43 @@
                   </div>
                 }
 
+                @case ('grid') {
+                  <div class="grid-field">
+                    <div class="grid-table-wrapper">
+                      <table>
+                        <thead>
+                          <tr>
+                            @for (column of gridColumns(field); track column) {
+                              <th>{{ column }}</th>
+                            }
+                            <th>Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (row of gridRows(field, fieldIndex); track row; let rowIndex = $index) {
+                            <tr>
+                              @for (column of gridColumns(field); track column) {
+                                <td>
+                                  <input
+                                    type="text"
+                                    [value]="$any(row)[column] || ''"
+                                    (input)="updateGridCell(field, fieldIndex, rowIndex, column, $any($event.target).value)"
+                                    [placeholder]="column"
+                                  />
+                                </td>
+                              }
+                              <td>
+                                <button class="btn btn-secondary" type="button" (click)="removeGridRow(field, fieldIndex, rowIndex)">Quitar</button>
+                              </td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                    <button class="btn btn-secondary" type="button" (click)="addGridRow(field, fieldIndex)">Agregar fila</button>
+                  </div>
+                }
+
                 @default {
                   <input [id]="fieldName(field, $index)" [type]="field.type || 'text'" [formControlName]="fieldName(field, $index)" [placeholder]="field.placeholder || ''" />
                 }
@@ -155,7 +192,8 @@
                       Ver Documento Adjunto
                     </a>
                   } @else {
-                    {{ savedAnswers[fieldName(field, i)] ?? 'Sin respuesta' }}
+                    <pre *ngIf="field.type === 'grid'; else plainAnswer">{{ formatAnswer(field, savedAnswers[fieldName(field, i)]) }}</pre>
+                    <ng-template #plainAnswer>{{ savedAnswers[fieldName(field, i)] ?? 'Sin respuesta' }}</ng-template>
                   }
 
                 </span>

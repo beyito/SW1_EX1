@@ -5,10 +5,11 @@ import com.politicanegocio.core.dto.OnlyOfficeConfigDto;
 import com.politicanegocio.core.model.DocumentAction;
 import com.politicanegocio.core.model.DocumentAuditLog;
 import com.politicanegocio.core.model.DocumentRecord;
-import com.politicanegocio.core.model.ProcessInstance;
+import com.politicanegocio.core.model.DocumentVersion;
 import com.politicanegocio.core.model.User;
 import com.politicanegocio.core.repository.DocumentAuditLogRepository;
 import com.politicanegocio.core.repository.DocumentRecordRepository;
+import com.politicanegocio.core.repository.DocumentVersionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,6 +36,7 @@ public class OnlyOfficeService {
 
     private final DocumentRecordRepository documentRecordRepository;
     private final DocumentAuditLogRepository auditLogRepository;
+    private final DocumentVersionRepository documentVersionRepository;
     private final S3Service s3Service;
     private final DocumentAccessService accessService;
     private final HttpClient httpClient;
@@ -46,6 +48,7 @@ public class OnlyOfficeService {
     public OnlyOfficeService(
             DocumentRecordRepository documentRecordRepository,
             DocumentAuditLogRepository auditLogRepository,
+            DocumentVersionRepository documentVersionRepository,
             S3Service s3Service,
             DocumentAccessService accessService,
             @Value("${app.onlyoffice.document-server-url:http://localhost:8082}") String documentServerUrl,
@@ -56,6 +59,7 @@ public class OnlyOfficeService {
     ) {
         this.documentRecordRepository = documentRecordRepository;
         this.auditLogRepository = auditLogRepository;
+        this.documentVersionRepository = documentVersionRepository;
         this.s3Service = s3Service;
         this.accessService = accessService;
         this.httpClient = HttpClient.newBuilder()
@@ -140,10 +144,14 @@ public class OnlyOfficeService {
             }
 
             byte[] updatedBytes = response.body();
-            s3Service.replaceObject(record.getS3Key(), updatedBytes, record.getContentType());
+            String s3VersionId = s3Service.replaceObject(record.getS3Key(), updatedBytes, record.getContentType());
+            int nextVersion = Math.max(1, record.getCurrentVersionNumber()) + 1;
             record.setSize(updatedBytes.length);
+            record.setCurrentVersionNumber(nextVersion);
+            record.setCurrentS3VersionId(s3VersionId);
             record.setUpdatedAt(LocalDateTime.now());
             documentRecordRepository.save(record);
+            createVersion(record, s3VersionId, "onlyoffice", "ONLYOFFICE_CALLBACK");
             logOnlyOfficeSave(record, "/api/onlyoffice/callback/" + documentId);
         } catch (Exception exception) {
             log.warn("Fallo guardando callback OnlyOffice: documentId={}", documentId, exception);
@@ -160,6 +168,23 @@ public class OnlyOfficeService {
         auditLog.setPath(path);
         auditLog.setTimestamp(LocalDateTime.now());
         auditLogRepository.save(auditLog);
+    }
+
+    private void createVersion(DocumentRecord record, String s3VersionId, String createdBy, String source) {
+        DocumentVersion version = new DocumentVersion();
+        version.setDocumentId(record.getId());
+        version.setProcessInstanceId(record.getProcessInstanceId());
+        version.setPolicyId(record.getPolicyId());
+        version.setVersionNumber(Math.max(1, record.getCurrentVersionNumber()));
+        version.setFileName(record.getFileName());
+        version.setContentType(record.getContentType());
+        version.setSize(record.getSize());
+        version.setS3Key(record.getS3Key());
+        version.setS3VersionId(s3VersionId);
+        version.setCreatedBy(createdBy);
+        version.setSource(source);
+        version.setCreatedAt(LocalDateTime.now());
+        documentVersionRepository.save(version);
     }
 
     private void logAction(User user, DocumentRecord record, String method, String path) {

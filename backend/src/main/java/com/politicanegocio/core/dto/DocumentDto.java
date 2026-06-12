@@ -20,6 +20,8 @@ public class DocumentDto {
     private String url;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private int currentVersionNumber;
+    private String currentS3VersionId;
     private boolean canEdit;
     private boolean canDelete;
 
@@ -38,6 +40,8 @@ public class DocumentDto {
                 url,
                 record.getCreatedAt(),
                 record.getUpdatedAt(),
+                record.getCurrentVersionNumber(),
+                record.getCurrentS3VersionId(),
                 canEdit,
                 canDelete
         );

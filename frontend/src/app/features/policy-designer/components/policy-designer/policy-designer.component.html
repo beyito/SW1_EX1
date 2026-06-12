@@ -180,6 +180,7 @@
                 <option value="select">Seleccion unica</option>
                 <option value="checkbox">Seleccion multiple</option>
                 <option value="file">Archivo</option>
+                <option value="grid">Cuadricula</option>
               </select>
 
               <label>Pregunta</label>
@@ -188,6 +189,14 @@
               <div *ngIf="newFieldType === 'select' || newFieldType === 'checkbox'">
                 <label>Opciones (separadas por coma)</label>
                 <input type="text" [(ngModel)]="newFieldOptions" placeholder="Opcion 1, Opcion 2, Opcion 3" />
+              </div>
+
+              <div *ngIf="newFieldType === 'grid'">
+                <label>Columnas de la cuadrícula (separadas por coma)</label>
+                <input type="text" [(ngModel)]="newFieldGridColumns" placeholder="Producto, Cantidad, Observación" />
+
+                <label>Filas iniciales</label>
+                <input type="number" min="1" [(ngModel)]="newFieldGridRows" />
               </div>
 
               <div class="field-options">
